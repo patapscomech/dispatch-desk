@@ -10,7 +10,7 @@ export interface Terms {
   rental_multiplier: number
   trip_charge: number
 }
-export interface LaborIn { hours: number; classification: string; period: Period }
+export interface LaborIn { hours: number; classification: string; period: Period; controls?: boolean }
 export interface PartIn { description: string; qty: number; unit_cost: number; source: string }
 export interface Line { kind: 'labor' | 'material' | 'sub' | 'rental' | 'trip'; description: string; qty: number; unit: number; amount: number }
 
@@ -24,7 +24,8 @@ export function laborLines(entries: LaborIn[], rates: Rate[]): { lines: Line[]; 
   const groups = new Map<string, Line>()
   const missing: LaborIn[] = []
   for (const e of entries) {
-    const r = rateFor(rates, e.classification)
+    // Controls repair is billed at the contract's controls rate whoever does it (if it has one).
+    const r = (e.controls ? rates.find((x) => x.rate_class === 'Controls') : undefined) ?? rateFor(rates, e.classification)
     if (!r) { missing.push(e); continue }
     const price = e.period === 'holiday' ? (r.holiday ?? r.overtime) : e.period === 'after_hours' ? r.overtime : r.regular
     const unit = fl(price)

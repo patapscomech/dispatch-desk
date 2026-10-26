@@ -29,6 +29,7 @@ export default function Hours({ d, presetJob = '' }: { d: Data; presetJob?: stri
   const [taskId, setTaskId] = useState('')
   const [hrs, setHrs] = useState('')
   const [pay, setPay] = useState<PayType>('regular')
+  const [controls, setControls] = useState(false)
   const [period, setPeriod] = useState<'regular' | 'after_hours' | 'holiday'>('regular')
   const [notes, setNotes] = useState('')
 
@@ -62,7 +63,7 @@ export default function Hours({ d, presetJob = '' }: { d: Data; presetJob?: stri
     setBusy(true)
     setErr('')
     const row = {
-      id: uuid(), employee_id: forId, work_date: date, hours: r2(h), pay_type: pay, bill_period: period,
+      id: uuid(), employee_id: forId, work_date: date, hours: r2(h), pay_type: pay, bill_period: period, controls,
       job_id: jobId || null, task_id: taskId || null, notes: notes.trim(),
     }
     const mine: Entry = { ...row, status: 'open', classification: '', prevailing_wage: !!d.jobs.find((j) => j.id === jobId)?.prevailing_wage }
@@ -156,6 +157,7 @@ export default function Hours({ d, presetJob = '' }: { d: Data; presetJob?: stri
               <option value="holiday">Sunday / holiday</option>
             </select>
           </label>
+          <label className="check"><input type="checkbox" checked={controls} onChange={(e) => setControls(e.target.checked)} /> Controls repair</label>
           <label>Note (optional)
             <input value={notes} onChange={(e) => setNotes(e.target.value)} />
           </label>

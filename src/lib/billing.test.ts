@@ -14,7 +14,25 @@ const sheet3: Rate[] = [
   { rate_class: 'Foreman', label: 'Lead Technician', regular: 130, overtime: 175, holiday: 200 },
   { rate_class: 'Helper', label: 'Technician Helper', regular: 70, overtime: 90, holiday: 110 },
 ]
+const mva: Rate[] = [
+  { rate_class: 'Journeyman', label: 'Journeyman', regular: 110, overtime: 140 },
+  { rate_class: 'Apprentice', label: 'Apprentice', regular: 65, overtime: 90 },
+  { rate_class: 'Controls', label: 'Controls repair', regular: 160, overtime: 240 },
+]
 describe('billing', () => {
+  it('controls repair bills at the controls rate for anyone', () => {
+    const { lines } = laborLines([
+      { hours: 2, classification: 'Journeyman', period: 'regular', controls: true },
+      { hours: 1, classification: 'Apprentice', period: 'after_hours', controls: true },
+      { hours: 2, classification: 'Journeyman', period: 'regular' },
+      { hours: 2, classification: 'Apprentice', period: 'after_hours' },
+    ], mva)
+    expect(lines.map((l) => l.amount)).toEqual([320, 240, 220, 180])
+  })
+  it('controls hours use the person own rate when the contract has no controls rate', () => {
+    const { lines } = laborLines([{ hours: 1, classification: 'Journeyman', period: 'regular', controls: true }], county)
+    expect(lines[0].amount).toBe(117)
+  })
   it('three periods: regular, after hours, Sunday and holiday', () => {
     const { lines } = laborLines([
       { hours: 2, classification: 'Foreman', period: 'regular' },

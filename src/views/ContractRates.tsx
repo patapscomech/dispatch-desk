@@ -65,7 +65,7 @@ export default function ContractRates({ contractId }: { contractId: string }) {
   if (!open) return <button className="btn ghost" onClick={() => setOpen(true)}>Billing terms and rates</button>
   if (!terms) return <div className="muted sm">{msg || 'Loading…'}</div>
   const used = new Set(rates.map((r) => r.rate_class))
-  const free = ['All', ...CLASSES].filter((c) => !used.has(c))
+  const free = ['All', ...CLASSES, 'Controls'].filter((c) => !used.has(c))
   return (
     <div className="form">
       <label>Billing method
@@ -76,7 +76,7 @@ export default function ContractRates({ contractId }: { contractId: string }) {
       <b className="sm">Labor rates (per hour)</b>
       {rates.map((r, i) => (
         <div className="row" key={r.rate_class}>
-          <span style={{ minWidth: 110 }}>{r.rate_class === 'All' ? 'Everyone' : r.rate_class}</span>
+          <span style={{ minWidth: 110 }}>{r.rate_class === 'All' ? 'Everyone' : r.rate_class === 'Controls' ? 'Controls repair' : r.rate_class}</span>
           <input placeholder="Customer's name for it" value={r.label} onChange={(e) => setRate(i, { label: e.target.value })} style={{ width: 150 }} />
           <input aria-label="Regular rate" inputMode="decimal" placeholder="Regular" value={r.regular} onChange={(e) => setRate(i, { regular: e.target.value })} style={{ width: 80 }} />
           <input aria-label="Overtime rate" inputMode="decimal" placeholder="After hrs" value={r.overtime} onChange={(e) => setRate(i, { overtime: e.target.value })} style={{ width: 80 }} />
@@ -89,7 +89,7 @@ export default function ContractRates({ contractId }: { contractId: string }) {
         <div className="row">
           {free.map((c) => (
             <button type="button" key={c} className="btn ghost" onClick={() => setRates([...rates, { rate_class: c, label: '', regular: '', overtime: '', holiday: '' }])}>
-              + {c === 'All' ? 'One rate for everyone' : c}
+              + {c === 'All' ? 'One rate for everyone' : c === 'Controls' ? 'Controls repair rate' : c}
             </button>
           ))}
         </div>

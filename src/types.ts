@@ -132,6 +132,7 @@ export interface Entry {
   work_date: string
   hours: number
   pay_type: PayType
+  controls?: boolean
   bill_period?: 'regular' | 'after_hours' | 'holiday'
   job_id: string | null
   task_id: string | null
