@@ -1,0 +1,1035 @@
+<title>Dispatch Desk</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky top bar with role switcher and tabs; dispatch board = crew rows x day columns; job detail slides in from the right. Copper accent (pipe) on slate neutrals. */
+:root{
+  --bg:#f1f3f5;--surface:#fff;--surface2:#e8ecf0;--line:#d3dae1;--fg:#16202a;--muted:#566574;
+  --accent:#a5461a;--accent-soft:#f6e4d9;--on-accent:#fff;--today:#fff6ee;
+  --good:#17714a;--good-soft:#dcf1e5;--warn:#8f5b00;--warn-soft:#fbecc8;--crit:#b0231b;--crit-soft:#fbdcd9;--info:#17609f;--info-soft:#dcebf8;
+  --f-display:'Barlow Condensed','Arial Narrow',sans-serif;--f-body:'Barlow',system-ui,sans-serif;--f-mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10161c;--surface:#19212a;--surface2:#222c36;--line:#2f3b47;--fg:#e6ebf0;--muted:#92a1ae;
+  --accent:#ec9660;--accent-soft:#3a2417;--on-accent:#1a0f08;--today:#231d19;
+  --good:#4cc38a;--good-soft:#14301f;--warn:#e6b34a;--warn-soft:#33290d;--crit:#ff8379;--crit-soft:#3a1714;--info:#6db3f2;--info-soft:#12293f;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10161c;--surface:#19212a;--surface2:#222c36;--line:#2f3b47;--fg:#e6ebf0;--muted:#92a1ae;
+  --accent:#ec9660;--accent-soft:#3a2417;--on-accent:#1a0f08;--today:#231d19;
+  --good:#4cc38a;--good-soft:#14301f;--warn:#e6b34a;--warn-soft:#33290d;--crit:#ff8379;--crit-soft:#3a1714;--info:#6db3f2;--info-soft:#12293f;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 var(--f-body);padding-block:0 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:50;background:var(--surface)}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;margin:0;letter-spacing:.01em}
+h1{font-size:28px}h2{font-size:20px}h3{font-size:16px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-size:12px}
+.muted{color:var(--muted)}.sm{font-size:12px}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px)));padding:8px max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--line)}
+.top-row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.brand{font:700 22px var(--f-display);letter-spacing:.03em;display:flex;align-items:center;gap:8px}
+.brand i{width:12px;height:12px;background:var(--accent);display:inline-block;transform:rotate(45deg)}
+.tabs{display:flex;gap:2px;overflow-x:auto;margin-top:6px}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:8px 12px;font-weight:600;color:var(--muted);white-space:nowrap}
+.tab[aria-current="true"]{color:var(--fg);border-color:var(--accent)}
+.banner{background:var(--info-soft);color:var(--info);padding:6px 12px;border-radius:4px;margin:12px 0;font-size:12px}
+main{padding-top:4px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0}
+.bar .grow{flex:1}
+.inp{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:6px 8px;min-width:0;max-width:100%}
+textarea.inp{width:100%;min-height:72px}
+.inp.s{width:84px}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:6px 12px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--surface2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn.ghost{border-color:transparent;background:none;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600;white-space:nowrap;background:var(--surface2);color:var(--muted)}
+.p-good{background:var(--good-soft);color:var(--good)}.p-warn{background:var(--warn-soft);color:var(--warn)}.p-crit{background:var(--crit-soft);color:var(--crit)}.p-info{background:var(--info-soft);color:var(--info)}.p-acc{background:var(--accent-soft);color:var(--accent)}
+.av{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:hsl(var(--h) 40% 34%);color:#fff;font-size:10px;font-weight:600;border:2px solid var(--surface);margin-left:-6px}
+.avs{display:inline-flex;padding-left:6px;vertical-align:middle}
+/* dispatch */
+.dispatch{display:grid;grid-template-columns:260px minmax(0,1fr);gap:14px;align-items:start}
+@media(max-width:900px){.dispatch{grid-template-columns:1fr}}
+.queue{display:flex;flex-direction:column;gap:8px}
+.qcard{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--pri,var(--line));border-radius:4px;padding:8px;cursor:grab}
+.scroll-x{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.board{border-collapse:collapse;width:100%;min-width:900px;table-layout:fixed}
+.board th{font:600 13px var(--f-display);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:6px;border-bottom:1px solid var(--line);text-align:left}
+.board td{border-bottom:1px solid var(--line);border-left:1px solid var(--line);vertical-align:top;padding:4px;height:70px}
+.board td.emp{position:sticky;left:0;background:var(--surface);z-index:1;width:150px;border-left:0}
+.board .tdy{background:var(--today)}
+.chip{display:block;width:100%;text-align:left;background:var(--surface2);border:0;border-left:4px solid var(--pri,var(--line));border-radius:3px;padding:3px 6px;margin-bottom:3px;font-size:12px;line-height:1.3}
+.chip:hover{filter:brightness(.96)}
+.chip b{font-family:var(--f-mono);font-weight:500;font-size:11px;display:block}
+.chip .d{color:var(--muted);font-size:11px}
+.chip.done{opacity:.55}
+.pri-emergency{--pri:var(--crit)}.pri-high{--pri:var(--warn)}.pri-normal{--pri:var(--muted)}.pri-pm{--pri:var(--info)}
+/* lists */
+.jrow{display:grid;grid-template-columns:80px minmax(0,2.2fr) minmax(0,1.4fr) 120px 110px 100px;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--surface);width:100%;text-align:left;border-left:0;border-right:0;border-top:0}
+.jrow:hover{background:var(--surface2)}
+.jhead{font:600 12px var(--f-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);cursor:default;background:var(--bg)}
+.jhead:hover{background:var(--bg)}
+@media(max-width:820px){.jrow{grid-template-columns:1fr 1fr}.jhead{display:none}}
+.list{border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font:600 12px var(--f-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl .n{text-align:right;font-variant-numeric:tabular-nums}
+.wrap-x{overflow-x:auto}
+.meter{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;min-width:60px}
+.meter>i{display:block;height:100%;background:var(--accent)}
+.meter.over>i{background:var(--crit)}
+.pcard{margin-bottom:14px}
+.trow{display:grid;grid-template-columns:minmax(0,2fr) 110px 120px minmax(90px,1fr) 100px;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+@media(max-width:720px){.trow{grid-template-columns:1fr 1fr}}
+/* drawer + modal */
+.backdrop{position:fixed;inset:0;background:rgba(8,14,20,.55);z-index:40;border:0}
+.drawer{position:fixed;top:0;bottom:0;right:0;width:min(760px,100%);background:var(--bg);z-index:41;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);box-shadow:-8px 0 30px rgba(0,0,0,.25)}
+.dh{background:var(--surface);padding:12px max(16px,env(safe-area-inset-right,0px)) 0 16px;border-bottom:1px solid var(--line)}
+.db{overflow-y:auto;padding:16px max(16px,env(safe-area-inset-right,0px)) 40px 16px;flex:1}
+.dtabs{display:flex;gap:2px;overflow-x:auto;margin-top:8px}
+.modal{position:fixed;z-index:60;left:50%;top:6vh;transform:translateX(-50%);width:min(560px,calc(100% - 24px));max-height:88vh;overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:18px}
+.modal.wide{width:min(760px,calc(100% - 24px))}
+.backdrop.m{z-index:59}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.field>label,.lbl{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.cl-head{font:600 13px var(--f-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 4px}
+.cl-row{display:flex;gap:10px;align-items:center;padding:7px 4px;border-bottom:1px solid var(--line)}
+.cl-row input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent);flex:none}
+.cl-row .t{flex:1;min-width:0}
+.cl-row.ok .t{color:var(--muted);text-decoration:line-through}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.ph{background:var(--surface);border:1px solid var(--line);border-radius:6px;overflow:hidden;display:flex;flex-direction:column}
+.ph img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;cursor:zoom-in}
+.ph div{padding:6px;display:flex;flex-direction:column;gap:4px}
+.empty{border:1px dashed var(--line);border-radius:6px;padding:22px;text-align:center;color:var(--muted)}
+.days{display:flex;gap:6px;overflow-x:auto;margin:10px 0}
+.day{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 10px;min-width:74px;text-align:center}
+.day[aria-current="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.day b{display:block;font:600 18px var(--f-display)}
+.out{width:100%;min-height:200px;font:12px/1.5 var(--f-mono);background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:8px;white-space:pre}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:6px;z-index:80;font-weight:500}
+.split{display:grid;grid-template-columns:240px minmax(0,1fr);gap:14px;align-items:start}
+@media(max-width:820px){.split{grid-template-columns:1fr}}
+.side{display:flex;flex-direction:column;gap:6px}
+.side button{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:8px 10px}
+.side button[aria-current="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.visit{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+details>summary{cursor:pointer}
+/* invoice document */
+.inv{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:22px;max-width:860px}
+.inv h2{font-size:30px;letter-spacing:.12em}
+@media(prefers-reduced-motion:no-preference){.drawer.enter{animation:in .18s ease-out}@keyframes in{from{transform:translateX(30px);opacity:0}}}
+</style>
+<div id="app"></div><div id="layer"></div><div id="toast" class="toast" role="status" hidden></div>
+<script>
+'use strict';
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pd=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const ds=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const addDays=(s,n)=>{const d=pd(s);d.setDate(d.getDate()+n);return ds(d)};
+const diffDays=(a,b)=>Math.round((pd(b)-pd(a))/864e5);
+const mondayOf=s=>addDays(s,-((pd(s).getDay()+6)%7));
+const fmtD=s=>s?pd(s).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—';
+const fmtDW=s=>pd(s).toLocaleDateString('en-US',{weekday:'short'});
+const money=n=>'$'+(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const hrsF=n=>(Math.round(n*100)/100).toString();
+const uid=p=>p+Math.random().toString(36).slice(2,7);
+const slug=s=>String(s).toLowerCase().replace(/[^a-z]/g,'');
+const opt=(v,l,sel)=>`<option value="${esc(v)}"${v===sel?' selected':''}>${esc(l)}</option>`;
+const initials=n=>n.split(' ').map(w=>w[0]).join('');
+function splitCsv(l){const o=[];let c='',q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(q){if(ch==='"'){if(l[i+1]==='"'){c+='"';i++}else q=false}else c+=ch}else if(ch==='"')q=true;else if(ch===','){o.push(c);c=''}else c+=ch}o.push(c);return o}
+function parseLines(text){
+  const lines=String(text).replace(/\r/g,'').split('\n').map(l=>l.trim()).filter(Boolean);
+  if(!lines.length)return [];
+  let col=null;const IT=['item','task','description','step'];
+  const first=splitCsv(lines[0]).map(s=>s.trim().toLowerCase());
+  if(first.length>1&&first.some(h=>IT.includes(h))){col={item:first.findIndex(h=>IT.includes(h)),sec:first.indexOf('section'),typ:first.indexOf('type')};lines.shift()}
+  const out=[];let lastSec=null;
+  for(const raw of lines){
+    let t=raw,type='check';
+    if(col){const c=splitCsv(raw);t=(c[col.item]||'').trim();const sec=col.sec>=0?(c[col.sec]||'').trim():'';
+      if(sec&&sec!==lastSec){out.push({type:'head',text:sec});lastSec=sec}
+      const tv=col.typ>=0?(c[col.typ]||'').trim().toLowerCase():'';
+      if(tv==='value'||tv==='reading')type='value';
+      if(t)out.push({type,text:t});continue}
+    if(/^#+\s*/.test(t)){out.push({type:'head',text:t.replace(/^#+\s*/,'')});continue}
+    t=t.replace(/^([-*•]|\d+[.)]|\[[ xX]?\])\s*/,'');
+    if(/\|value\s*$/i.test(t)){type='value';t=t.replace(/\|value\s*$/i,'').trim()}
+    if(t)out.push({type,text:t});
+  }
+  return out;
+}
+const mkCl=items=>items.map(i=>({id:uid('c'),type:i.type,text:i.text,done:false,val:'',by:'',at:''}));
+const TPL=[
+ {id:'tp1',name:'RTU Quarterly PM',items:parseLines(`# Safety
+Lockout/tagout applied
+# Airside
+Replace filters
+Inspect belts and sheaves
+Supply air temp|value
+Return air temp|value
+# Refrigeration
+Suction pressure|value
+Discharge pressure|value
+Inspect condensate drain
+Clean condenser coil`)},
+ {id:'tp2',name:'Chiller Annual Inspection',items:parseLines(`# Mechanical
+Oil level and pressure|value
+Vibration reading|value
+Inspect starter and VFD connections
+# Refrigerant side
+Refrigerant charge check|value
+Evaporator approach temp|value
+Condenser approach temp|value
+# Controls
+Verify safeties
+Review trip log`)},
+ {id:'tp3',name:'Boiler Fall Startup',items:parseLines(`Inspect burner and flame
+O2 percent|value
+CO ppm|value
+Test low water cutoff
+Test relief valve
+Check expansion tank
+Verify controls and setpoints`)},
+ {id:'tp4',name:'Backflow Test',items:parseLines(`Gauge serial number|value
+Check valve 1 psi|value
+Check valve 2 psi|value
+Relief valve opening psi|value
+Tag device and file report`)},
+ {id:'tp5',name:'Job Close-Out',items:parseLines(`Work area cleaned
+Customer walkthrough done
+Before and after photos uploaded
+Parts invoices attached
+Customer signature obtained`)}
+];
+const R=(F,J,A,H)=>({Foreman:F,Journeyman:J,Apprentice:A,Helper:H});
+const S={
+  today:'2026-10-19',weekStart:'2026-10-19',view:'dispatch',user:'office',drawer:null,modal:null,
+  f:{status:'active',cust:''},time:{emp:'e2',date:'2026-10-19',job:''},ts:{from:'2026-10-12',to:'2026-10-18',incl:'approved',fmt:'pay',again:false,out:'',ids:[],count:0},
+  custSel:'c1',invoices:[],bill:{jobId:null,no:'',date:'2026-10-19',terms:'Net 30',po:'',tax:0,fmt:'qbo',out:''},tplSel:'tp1',partFilter:'all',
+  employees:[
+   {id:'e1',name:'Tom Heller',role:'Foreman',cls:'Foreman'},{id:'e2',name:'Luis Ortega',role:'Service Tech',cls:'Journeyman'},
+   {id:'e3',name:'Dana Whitfield',role:'Service Tech',cls:'Journeyman'},{id:'e4',name:'Marcus Bell',role:'Plumber',cls:'Journeyman'},
+   {id:'e5',name:'Rae Kowalski',role:'Apprentice',cls:'Apprentice'},{id:'e6',name:'Jo Nakamura',role:'Plumber',cls:'Journeyman'},
+   {id:'e7',name:'Sam Reyes',role:'Helper',cls:'Helper'}],
+  customers:[{id:'c1',name:'Meridian County Public Schools'},{id:'c2',name:'State Dept. of General Services'},{id:'c3',name:'Harbor Transit Authority'},{id:'c4',name:'Tri-County Detention Center'}],
+  locations:[
+   {id:'l1',custId:'c1',name:'Cedar Ridge Elementary',addr:'410 Cedar Ridge Rd',notes:'Check in at front office. Roof hatch key in main office.'},
+   {id:'l2',custId:'c1',name:'Northfield High School',addr:'2200 Northfield Blvd',notes:'Boiler plant door off loading dock. Badge required.'},
+   {id:'l3',custId:'c1',name:'Central Administration Building',addr:'88 County Center Dr',notes:'Mechanical penthouse, freight elevator.'},
+   {id:'l4',custId:'c2',name:'State Police Barrack 7',addr:'1500 Route 140',notes:'Sign in with desk sergeant. No photos of secure areas.'},
+   {id:'l5',custId:'c2',name:'Annex Office Building',addr:'45 State Circle',notes:'Server room on 2nd floor, call facilities first.'},
+   {id:'l6',custId:'c3',name:'Pier 9 Maintenance Garage',addr:'9 Pier Rd',notes:'Gate code from dispatcher.'},
+   {id:'l7',custId:'c3',name:'Eastside Bus Depot',addr:'700 Depot Ave',notes:''},
+   {id:'l8',custId:'c4',name:'Main Facility',addr:'1 Correction Way',notes:'Tool inventory at sally port. Escort required.'}],
+  contracts:[
+   {id:'k1',custId:'c1',name:'Annual Service Agreement',type:'Service',pw:true,rates:R(118,104,72,58),ot:1.5,markup:15,trip:85,start:'2026-07-01',end:'2027-06-30'},
+   {id:'k2',custId:'c1',name:'Capital Renewal T&M',type:'Project',pw:true,rates:R(132,118,80,64),ot:1.5,markup:10,trip:0,start:'2026-08-15',end:'2027-08-14'},
+   {id:'k3',custId:'c2',name:'IQC HVAC',type:'Service',pw:true,rates:R(124,110,76,60),ot:1.5,markup:12,trip:95,start:'2026-01-01',end:'2026-12-31'},
+   {id:'k4',custId:'c3',name:'Master Service Agreement',type:'Service',pw:false,rates:R(112,98,68,55),ot:1.5,markup:20,trip:75,start:'2026-03-01',end:'2027-02-28'},
+   {id:'k5',custId:'c4',name:'Mechanical Fixed Rate',type:'Service',pw:true,rates:R(128,112,78,62),ot:1.5,markup:18,trip:110,start:'2026-01-01',end:'2026-12-31'},
+   {id:'k6',custId:'c4',name:'Emergency Callout',type:'Emergency',pw:true,rates:R(165,145,100,80),ot:2,markup:25,trip:150,start:'2026-01-01',end:'2026-12-31'}],
+  templates:TPL,jobs:[],times:[]
+};
+const T=(id,title,c,l,k,pri,status,start,end,asg,desc,tpl,extra)=>Object.assign({id,kind:'ticket',title,custId:c,locId:l,contractId:k,priority:pri,status,start,end,assignees:asg,lead:asg[0]||'',desc,trip:true,checklist:tpl?mkCl(TPL.find(x=>x.id===tpl).items):[],parts:[],photos:[]},extra||{});
+S.jobs=[
+ T('T-1043','No cooling in server room','c2','l5','k3','Emergency','In progress','2026-10-19','2026-10-19',['e3','e1'],'Room at 86F. CRAC unit tripping on high head pressure.',null,{parts:[{id:'pa1',desc:'Condenser fan motor 1/2 hp',qty:1,cost:286,src:'Purchased by tech',vendor:'Johnstone Supply',by:'e3',reimb:true,invoice:null}]}),
+ T('T-1042','RTU-3 compressor replacement','c1','l1','k1','High','Scheduled','2026-10-20','2026-10-22',['e2','e5','e7'],'Scroll compressor failed on RTU-3. Crane not needed, hand carry via roof hatch.','tp5',{parts:[{id:'pa2',desc:'Scroll compressor, 10 ton',qty:1,cost:1840,src:'Supplier PO',vendor:'Johnstone Supply',by:'',reimb:false,invoice:{name:'JS-88231.pdf',src:'',kind:'pdf'}},{id:'pa3',desc:'R-410A refrigerant (lb)',qty:12,cost:14.5,src:'Stock',vendor:'',by:'',reimb:false,invoice:null}]}),
+ T('T-1044','Quarterly PM, RTUs A to C','c1','l2','k1','PM','Scheduled','2026-10-21','2026-10-23',['e3','e5'],'Rooftop units A, B and C.','tp1'),
+ T('T-1045','Unit heater not firing in garage','c3','l6','k4','Normal','Unassigned',null,null,[],'Bay 2 unit heater lockout. Reported by shop foreman.',null),
+ T('T-1046','Backflow preventer test','c4','l8','k5','Normal','Scheduled','2026-10-22','2026-10-22',['e4'],'Annual test, 4 assemblies.','tp4'),
+ T('T-1047','Chiller vibration noise','c1','l3','k1','High','Unassigned',null,null,[],'Noise from chiller 1 compressor end, worse at part load.','tp2'),
+ T('T-1048','Hot water recirc pump replacement','c2','l4','k3','Normal','Scheduled','2026-10-23','2026-10-24',['e6','e4'],'Replace both recirc pumps, new isolation valves.',null),
+ T('T-1041','Replace 6 thermostats','c1','l3','k1','Normal','Complete','2026-10-15','2026-10-16',['e3','e5'],'Programmable to BAS-compatible.','tp5'),
+ T('T-1040','Boiler fall startup','c1','l1','k1','PM','Complete','2026-10-13','2026-10-14',['e1','e2'],'Two boilers, annual startup and combustion tuning.','tp3'),
+ T('T-1038','Water heater flush and anode check','c3','l7','k4','Normal','Complete','2026-10-14','2026-10-14',['e4','e6'],'',null),
+ {id:'P-210',kind:'project',title:'Northfield HS boiler plant replacement',custId:'c1',locId:'l2',contractId:'k2',priority:'High',status:'In progress',start:'2026-10-12',end:'2026-11-17',assignees:[],lead:'e1',desc:'Remove two 1970s boilers, set two condensing boilers, new headers, controls tie-in.',trip:false,checklist:[],parts:[],photos:[],
+  tasks:[
+   {id:'t1',name:'Demo existing boilers',budget:120,assignees:['e1','e2','e7'],start:'2026-10-12',end:'2026-10-23',status:'In progress'},
+   {id:'t2',name:'Set and rig new boilers',budget:160,assignees:['e1','e2','e3'],start:'2026-10-26',end:'2026-11-06',status:'Not started'},
+   {id:'t3',name:'Piping and headers',budget:240,assignees:['e2','e3','e4','e6'],start:'2026-10-26',end:'2026-11-13',status:'Not started'},
+   {id:'t4',name:'Controls and startup',budget:80,assignees:['e1','e3'],start:'2026-11-09',end:'2026-11-17',status:'Not started'}]},
+ {id:'P-211',kind:'project',title:'Pier 9 garage ventilation upgrade',custId:'c3',locId:'l6',contractId:'k4',priority:'Normal',status:'In progress',start:'2026-10-19',end:'2026-11-13',assignees:[],lead:'e4',desc:'New exhaust fans and make-up air for the maintenance bays.',trip:false,checklist:mkCl(parseLines('Layout verified with customer\nFans mounted and wired\nAirflow readings|value')),parts:[],photos:[],
+  tasks:[
+   {id:'p1',name:'Ductwork fabrication',budget:90,assignees:['e4','e5'],start:'2026-10-19',end:'2026-10-30',status:'In progress'},
+   {id:'p2',name:'Install exhaust fans',budget:70,assignees:['e2','e7'],start:'2026-11-02',end:'2026-11-06',status:'Not started'},
+   {id:'p3',name:'Commissioning',budget:24,assignees:[],start:null,end:null,status:'Not started'}]}
+];
+S.jobs.find(j=>j.id==='T-1040').parts.push({id:'pa9',desc:'Gas valve gasket kit',qty:2,cost:38.5,src:'Supplier PO',vendor:'Johnstone Supply',by:'',reimb:false,invoice:{name:'JS-88102.pdf',src:'',kind:'pdf'}});
+S.jobs.find(j=>j.id==='T-1042').checklist[0].done=true;
+S.jobs.find(j=>j.id==='T-1044').checklist.slice(0,3).forEach(c=>{c.done=true;c.by='Dana Whitfield';c.at='Oct 14 9:10 AM'});
+[
+ ['e1','2026-10-13','T-1040',null,6,'ST','Startup, combustion test both boilers','approved'],['e2','2026-10-13','T-1040',null,6,'ST','','approved'],
+ ['e1','2026-10-14','T-1040',null,4,'ST','Final tuning and report','approved'],['e2','2026-10-14','T-1040',null,4,'ST','','approved'],
+ ['e1','2026-10-12','P-210','t1',8,'ST','Isolate, drain, start demo','approved'],['e2','2026-10-12','P-210','t1',8,'ST','','approved'],['e7','2026-10-12','P-210','t1',8,'ST','','approved'],
+ ['e1','2026-10-13','P-210','t1',2,'ST','Demo prep','approved'],['e2','2026-10-13','P-210','t1',2,'ST','','approved'],
+ ['e1','2026-10-15','P-210','t1',8,'ST','Cut and cap lines','submitted'],['e2','2026-10-15','P-210','t1',8,'ST','','submitted'],
+ ['e7','2026-10-15','P-210','t1',8,'ST','Haul out scrap','submitted'],['e7','2026-10-15','P-210','t1',1.5,'OT','Haul out scrap','submitted'],
+ ['e3','2026-10-15','T-1041',null,7,'ST','Replaced 3 of 6','submitted'],['e5','2026-10-15','T-1041',null,7,'ST','','submitted'],
+ ['e3','2026-10-16','T-1041',null,6,'ST','Replaced rest, verified on BAS','submitted'],['e5','2026-10-16','T-1041',null,6,'ST','','submitted'],
+ ['e4','2026-10-14','T-1038',null,5,'ST','Flushed 3 heaters','approved'],['e6','2026-10-14','T-1038',null,5,'ST','','approved'],
+ ['e3','2026-10-19','T-1043',null,3.5,'ST','Diagnosing condenser fan failure','open'],['e1','2026-10-19','T-1043',null,3.5,'ST','','open'],
+ ['e2','2026-10-19','P-210','t1',6,'ST','Demo, cut and cap lines','open'],['e7','2026-10-19','P-210','t1',6,'ST','','open'],['e4','2026-10-19','P-211','p1',6,'ST','Layout and fab','open']
+].forEach(r=>S.times.push({id:uid('t'),emp:r[0],date:r[1],jobId:r[2],taskId:r[3],hrs:r[4],type:r[5],note:r[6],status:r[7]}));
+const SHOP_JOB={id:'SHOP',kind:'shop',title:'Shop time (unallocated)',custId:null,locId:null,contractId:null,tasks:[]};
+(function(){const days=['2026-10-12','2026-10-13','2026-10-14','2026-10-15','2026-10-16'];const notes=['Stock truck, shop cleanup','Inventory and van restock','Shop prep, tool maintenance'];let n=0;
+ S.employees.forEach(e=>days.forEach(d=>{const st=S.times.filter(t=>t.emp===e.id&&t.date===d&&t.type==='ST').reduce((s,t)=>s+t.hrs,0);
+  if(st<8)S.times.push({id:uid('t'),emp:e.id,date:d,jobId:'SHOP',taskId:null,hrs:8-st,type:'ST',note:notes[n++%3],status:d<='2026-10-14'?'approved':'submitted'})}));
+ S.times.push({id:uid('t'),emp:'e5',date:'2026-10-19',jobId:'SHOP',taskId:null,hrs:2,type:'ST',note:'Load truck for RTU-3 job',status:'open'});})();
+const jb=id=>id==='SHOP'?SHOP_JOB:job(id);
+const emp=id=>S.employees.find(e=>e.id===id)||{name:'—',cls:'Helper',role:''};
+const cust=id=>S.customers.find(c=>c.id===id)||{name:'—'};
+const loc=id=>S.locations.find(l=>l.id===id)||{name:'—',addr:'',notes:''};
+const con=id=>S.contracts.find(c=>c.id===id);
+const job=id=>S.jobs.find(j=>j.id===id);
+const isOffice=()=>S.user==='office';
+const jobHrs=(id,tid)=>S.times.filter(t=>t.jobId===id&&(!tid||t.taskId===tid)).reduce((s,t)=>s+t.hrs,0);
+function billing(j){
+  const c=con(j.contractId);if(!c)return null;
+  const by={};let labor=0;
+  S.times.filter(x=>x.jobId===j.id).forEach(x=>{const e=emp(x.emp);const r=c.rates[e.cls]||0;const m=x.type==='OT'?c.ot:1;const k=e.cls+(x.type==='OT'?' overtime':'');
+    by[k]=by[k]||{h:0,rate:r*m,amt:0};by[k].h+=x.hrs;by[k].amt+=x.hrs*r*m;labor+=x.hrs*r*m});
+  const pc=j.parts.reduce((s,p)=>s+p.qty*p.cost,0);const parts=pc*(1+c.markup/100);
+  const trip=(j.kind==='ticket'&&j.trip)?c.trip:0;
+  return {c,by,labor,pc,parts,trip,total:labor+parts+trip};
+}
+const needsInv=p=>p.src!=='Stock'&&p.src!=='Subcontractor';
+const EQ=(id,l,tag,type,make,model,serial,area,inst,notes)=>({id,locId:l,tag,type,make,model,serial,area,inst,notes:notes||''});
+S.equipment=[
+ EQ('q1','l1','RTU-3','Rooftop unit','Carrier','48TCDA12','1214E10532','Roof, gym wing','2014','10 ton, R-410A'),
+ EQ('q2','l1','RTU-4','Rooftop unit','Trane','YSC120','16210A4471','Roof, cafeteria','2016','10 ton, R-410A'),
+ EQ('q3','l1','BLR-1','Boiler','Weil-McLain','88','H12-0831','Boiler room','2012','Gas, cast iron'),
+ EQ('q4','l1','BLR-2','Boiler','Weil-McLain','88','H12-0832','Boiler room','2012','Gas, cast iron'),
+ EQ('q6','l2','BLR-A','Boiler','Smith','28 Series','78-4410','Boiler plant','1978','Original, scheduled for replacement'),
+ EQ('q7','l2','BLR-B','Boiler','Smith','28 Series','78-4411','Boiler plant','1978','Original, scheduled for replacement'),
+ EQ('q8','l2','RTU-A','Rooftop unit','Lennox','LGH120','5614E07712','Roof, north wing','2015',''),
+ EQ('q22','l2','RTU-B','Rooftop unit','Lennox','LGH120','5614E07713','Roof, north wing','2015',''),
+ EQ('q23','l2','RTU-C','Rooftop unit','Lennox','LGH120','5614E07714','Roof, south wing','2015',''),
+ EQ('q9','l3','CH-1','Chiller','York','YCAL0080','NRKM013352','Penthouse','2011','Air cooled, scroll'),
+ EQ('q10','l3','AHU-1','Air handler','Trane','M-Series','K11B02291','Penthouse','2011',''),
+ EQ('q12','l4','HWR-1','Pump','Bell & Gossett','e-60','1610AB8841','Mechanical room','2018','Hot water recirc'),
+ EQ('q13','l4','HWR-2','Pump','Bell & Gossett','e-60','1610AB8842','Mechanical room','2018','Hot water recirc'),
+ EQ('q14','l4','WH-1','Water heater','A.O. Smith','BTH-199','M17-3391','Mechanical room','2017',''),
+ EQ('q15','l5','CRAC-1','CRAC unit','Liebert','DS028','2012C41187','Server room','2012','Condenser fan motor bearings noisy'),
+ EQ('q16','l5','CRAC-2','CRAC unit','Liebert','DS028','2012C41188','Server room','2012',''),
+ EQ('q17','l6','UH-2','Unit heater','Modine','HD75','BL-2208841','Bay 2 ceiling','2019','Gas, 75 MBH'),
+ EQ('q18','l6','UH-3','Unit heater','Modine','HD75','BL-2208842','Bay 3 ceiling','2019','Gas, 75 MBH'),
+ EQ('q19','l7','WH-2','Water heater','A.O. Smith','BTX-100','M16-7720','Break room closet','2016',''),
+ EQ('q20','l8','BFP-1','Backflow preventer','Watts','909','BF-30012','Sally port mech room','2013','Tested annually'),
+ EQ('q21','l8','BFP-2','Backflow preventer','Watts','909','BF-30013','Sally port mech room','2013','Relief valve trending low')];
+S.hf='all';
+const VAL={'Supply air temp':'56','Return air temp':'75','Suction pressure':'118','Discharge pressure':'340','O2 percent':'4.5','CO ppm':'18','Gauge serial number':'BG-2291','Check valve 1 psi':'6.2','Check valve 2 psi':'4.1','Relief valve opening psi':'2.8'};
+const fill=j=>{j.checklist.forEach(c=>{if(c.type==='check'){c.done=true;c.by=emp(j.assignees[0]).name}else if(c.type==='value')c.val=VAL[c.text]||'ok'});return j};
+const pt=(d,q,c)=>({id:uid('pa'),desc:d,qty:q,cost:c,src:'Stock',vendor:'',by:'',reimb:false,invoice:null,invId:'INV-HIST'});
+const H=(id,t,c,l,k,pri,s,e,asg,desc,tpl,eq,res,parts)=>{const j=T(id,t,c,l,k,pri,'Complete',s,e,asg,desc,tpl,{equip:eq,resolution:res,tripBilled:true,pmBilled:true,parts:parts||[]});return tpl?fill(j):j};
+S.jobs.push(
+ H('T-0988','RTU-3 low airflow complaint','c1','l1','k1','Normal','2026-03-12','2026-03-12',['e2'],'Gym wing hot, low airflow reported.',null,['q1'],'Belt glazed and slipping. Replaced belt and sheave, cleaned evaporator coil. Airflow back to normal. One compressor phase reads about 8% high, watch it.',[pt('V-belt B68',2,18),pt('Sheave',1,64)]),
+ H('T-0941','Quarterly PM, RTUs 3 and 4','c1','l1','k1','PM','2026-01-20','2026-01-21',['e3','e5'],'Quarterly maintenance.','tp1',['q1','q2'],'Both units serviced and filters changed. RTU-3 compressor drawing high amps on L2. Flagged for follow up.',[pt('Filters 20x25x4',8,22)]),
+ H('T-0877','Boiler fall startup','c1','l1','k1','PM','2025-09-04','2025-09-04',['e1','e2'],'Annual startup.','tp3',['q3','q4'],'Both boilers started and tuned. BLR-2 low water cutoff replaced during startup.',[pt('Low water cutoff',1,210)]),
+ H('T-1010','RTU-4 not cooling','c1','l1','k1','High','2026-08-20','2026-08-20',['e2'],'No cooling in cafeteria.',null,['q2'],'Contactor pitted. Replaced contactor and run capacitor. Unit cooling normally.',[pt('Contactor 2 pole 40A',1,46),pt('Run capacitor 45/5',1,28)]),
+ H('T-0921','Boiler A leak at sight glass','c1','l2','k1','High','2025-12-12','2025-12-12',['e1','e2'],'Water leaking from gauge glass.',null,['q6'],'Replaced gauge glass and gaskets. Both boilers are original 1978 units. Recommend a replacement plan.',[pt('Gauge glass kit',1,95)]),
+ H('T-0990','Chiller 1 high head pressure','c1','l3','k1','High','2026-04-02','2026-04-02',['e1','e2'],'High head pressure alarm.',null,['q9'],'Condenser coil heavily fouled. Chemical cleaned, head pressure normal. Recommend coil cleaning each spring.',[]),
+ H('T-0960','Recirc pump noise','c2','l4','k3','Normal','2026-02-24','2026-02-24',['e6'],'Noisy recirc pump.',null,['q12'],'Coupling worn. Replaced coupling and aligned. Pump quiet. HWR-2 shows seepage at the seal, monitor.',[pt('Pump coupling',1,58)]),
+ H('T-0955','CRAC-1 high head pressure alarm','c2','l5','k3','Emergency','2026-02-10','2026-02-10',['e3'],'Alarm and room temp rising.',null,['q15'],'Condenser fan relay failed. Replaced relay, unit back in service in 3 hours. Fan motor bearings noisy and may need replacement soon.',[pt('Fan relay 24V',1,34)]),
+ H('T-0902','CRAC semiannual PM','c2','l5','k3','PM','2025-11-18','2025-11-18',['e3','e5'],'Semiannual maintenance.',null,['q15','q16'],'Filters changed, belts OK. CRAC-1 condenser fan motor bearing noise noted.',[pt('Filters',4,31)]),
+ H('T-0971','UH-2 igniter replacement','c3','l6','k4','Normal','2026-03-25','2026-03-25',['e4'],'Unit heater not lighting.',null,['q17'],'Replaced hot surface igniter and flame sensor. Unit fired normally.',[pt('Hot surface igniter',1,52),pt('Flame sensor',1,24)]),
+ H('T-0930','Garage exhaust fan belt','c3','l6','k4','Normal','2025-12-08','2025-12-08',['e2'],'Belt squeal on exhaust fan.',null,[],'Replaced belt on exhaust fan EF-1.',[pt('Belt A42',1,14)]),
+ H('T-0995','Backflow annual test','c4','l8','k5','Normal','2026-05-14','2026-05-14',['e4'],'Annual test.','tp4',['q20','q21'],'All assemblies passed. BFP-2 relief valve opened at 2.8 psi, within limits but trending low.',[])
+);
+S.jobs.push(T('T-1049','Semiannual PM, State Police Barrack 7','c2','l4','k3','PM','Complete','2026-10-16','2026-10-16',['e6','e4'],'Semiannual mechanical PM.',null,{equip:['q12','q13','q14'],resolution:'Both recirc pumps greased and aligned, water heater flushed and inspected. HWR-2 seal still weeping.'}));
+const EQMAP={'T-1043':['q15'],'T-1042':['q1'],'T-1044':['q8','q22','q23'],'T-1045':['q17'],'T-1046':['q20','q21'],'T-1047':['q9'],'T-1048':['q12','q13'],'T-1040':['q3','q4'],'P-210':['q6','q7']};
+S.jobs.forEach(j=>{j.equip=EQMAP[j.id]||j.equip||[];j.resolution=j.resolution||''});
+({e1:62,e2:52,e3:52,e4:54,e5:34,e6:54,e7:28}); Object.entries({e1:62,e2:52,e3:52,e4:54,e5:34,e6:54,e7:28}).forEach(([i,c])=>{emp(i).cost=c});
+S.contracts.forEach(k=>{k.method='tm';k.adS=10;k.pm={basis:'none',locPrices:{},locDefault:0,eqPrices:{}}});
+Object.assign(con('k1').pm,{basis:'equipment',eqPrices:{'Rooftop unit':285,'Boiler':420,'Chiller':780,'Air handler':310,'Pump':120,'Water heater':95,'Unit heater':85,'CRAC unit':360,'Backflow preventer':175}});
+Object.assign(con('k3').pm,{basis:'location',locDefault:950,locPrices:{l4:1200,l5:850}});
+Object.assign(con('k2'),{method:'costplus',adS:12});
+Object.assign(con('k5'),{method:'fixed',name:'Mechanical Fixed Price'});
+Object.assign(job('T-1046'),{fixedPrice:1450});
+Object.assign(job('T-1038'),{billAs:'fixed',fixedPrice:900});
+job('P-210').parts.push({id:'pa20',desc:'Black iron pipe and fittings, boiler headers',qty:1,cost:3180,src:'Supplier PO',vendor:'Ferguson',by:'',reimb:false,invoice:{name:'FG-44187.pdf',src:'',kind:'pdf'}},{id:'pa21',desc:'Crane and rigging, boiler removal',qty:1,cost:2400,src:'Subcontractor',vendor:'Apex Crane & Rigging',by:'',reimb:false,invoice:null});
+fill(job('T-1040'));fill(job('T-1041'));
+const STAT={Unassigned:'',Scheduled:'p-info','In progress':'p-acc','On hold':'p-warn',Complete:'p-good',Planning:'',Done:'p-good','Not started':''};
+const PRI={Emergency:'p-crit',High:'p-warn',Normal:'',PM:'p-info'};
+const spill=s=>`<span class="pill ${STAT[s]||''}">${esc(s)}</span>`;
+const ppill=s=>`<span class="pill ${PRI[s]||''}">${esc(s)}</span>`;
+const avs=ids=>ids.length?`<span class="avs">${ids.map(i=>{const k=S.employees.findIndex(e=>e.id===i);return `<span class="av" style="--h:${[18,200,150,265,340,45,100][k%7]}" title="${esc(emp(i).name)}">${esc(initials(emp(i).name))}</span>`}).join('')}</span>`:'<span class="muted sm">Unassigned</span>';
+const OFFICE_NAV=[['dispatch','Dispatch'],['jobs','Tickets'],['projects','Projects'],['time','Time entry'],['timesheets','Timesheets'],['billing','Billing'],['customers','Customers'],['checklists','Checklists'],['parts','Parts and invoices']];
+const TECH_NAV=[['mywork','My work'],['time','My time']];
+function headerHTML(){
+  const nav=isOffice()?OFFICE_NAV:TECH_NAV;
+  return `<header class="top"><div class="top-row"><div class="brand"><i></i>Dispatch Desk</div>
+   <label class="sm muted">Viewing as <select class="inp" data-chg="user"><option value="office"${isOffice()?' selected':''}>Office / dispatcher</option>${S.employees.map(e=>opt(e.id,e.name+' ('+e.role+')',S.user)).join('')}</select></label></div>
+   <nav class="tabs" aria-label="Sections">${nav.map(n=>`<button class="tab" data-act="nav" data-v="${n[0]}" aria-current="${S.view===n[0]}">${n[1]}</button>`).join('')}</nav></header>
+   <div class="banner">Prototype with sample data. Entries, uploads and edits stay in this preview and reset on reload.</div>`;
+}
+function schedItems(){
+  const out=[];
+  S.jobs.forEach(j=>{
+    if(j.kind==='ticket'){if(j.start&&j.assignees.length)out.push({key:j.id,job:j,label:j.title,assignees:j.assignees,start:j.start,end:j.end||j.start,done:j.status==='Complete'})}
+    else j.tasks.forEach(t=>{if(t.start&&t.assignees.length)out.push({key:j.id+':'+t.id,job:j,task:t,label:t.name,assignees:t.assignees,start:t.start,end:t.end||t.start,done:t.status==='Done'})});
+  });return out;
+}
+function dispatchView(){
+  const days=[...Array(7)].map((_,i)=>addDays(S.weekStart,i));
+  const its=schedItems();
+  const queue=[];
+  S.jobs.forEach(j=>{
+    if(j.kind==='ticket'){if((!j.start||!j.assignees.length)&&j.status!=='Complete')queue.push({key:j.id,job:j,label:j.title})}
+    else j.tasks.forEach(t=>{if((!t.start||!t.assignees.length)&&t.status!=='Done')queue.push({key:j.id+':'+t.id,job:j,task:t,label:t.name})});
+  });
+  const q=queue.map(i=>`<div class="qcard pri-${slug(i.job.priority)}" draggable="true" data-drag="${esc(i.key)}">
+    <div class="mono muted">${esc(i.job.id)} ${ppill(i.job.priority)}</div><div><b>${esc(i.label)}</b></div>
+    <div class="sm muted">${esc(i.task?i.job.title:cust(i.job.custId).name)} · ${esc(loc(i.job.locId).name)}</div>
+    <div style="margin-top:6px"><button class="btn sm" data-act="openAssign" data-key="${esc(i.key)}">Assign and schedule</button></div></div>`).join('')||'<div class="empty">Nothing waiting. Every open ticket has a crew and dates.</div>';
+  const rows=S.employees.map(e=>`<tr><td class="emp"><b>${esc(e.name)}</b><div class="sm muted">${esc(e.role)}</div></td>${days.map(d=>{
+    const cs=its.filter(i=>i.assignees.includes(e.id)&&i.start<=d&&d<=i.end);
+    return `<td class="${d===S.today?'tdy':''}" data-drop="1" data-emp="${e.id}" data-date="${d}">${cs.map(i=>{const n=diffDays(i.start,d)+1,tot=diffDays(i.start,i.end)+1;
+      return `<button class="chip pri-${slug(i.job.priority)}${i.done?' done':''}" data-act="openJob" data-id="${i.job.id}" data-tab="${i.task?'tasks':'overview'}"><b>${esc(i.job.id)}</b>${esc(i.label)}${tot>1?`<span class="d"> · day ${n} of ${tot}</span>`:''}</button>`}).join('')}</td>`}).join('')}</tr>`).join('');
+  return `<div class="bar"><h1>Dispatch</h1><span class="grow"></span>
+    <button class="btn" data-act="wk" data-n="-7">‹ Prev</button><b>${fmtD(days[0])} to ${fmtD(days[6])}</b><button class="btn" data-act="wk" data-n="7">Next ›</button><button class="btn" data-act="wk" data-n="0">This week</button>
+    <button class="btn pri" data-act="newJob">New ticket or project</button></div>
+   <div class="dispatch"><div><h3 style="margin-bottom:8px">Needs a crew (${queue.length})</h3><div class="queue">${q}</div><p class="sm muted">Drag a card onto a person and day, or use Assign to pick several people and a date range.</p></div>
+   <div class="scroll-x"><table class="board"><thead><tr><th style="width:150px">Crew</th>${days.map(d=>`<th class="${d===S.today?'tdy':''}">${fmtDW(d)} ${fmtD(d)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+function jobsView(){
+  const f=S.f;
+  let js=S.jobs.filter(j=>j.kind==='ticket');
+  if(f.status==='active')js=js.filter(j=>j.status!=='Complete');else if(f.status!=='all')js=js.filter(j=>j.status===f.status);
+  if(f.cust)js=js.filter(j=>j.custId===f.cust);
+  js.sort((a,b)=>(a.start||'9')<(b.start||'9')?-1:1);
+  return `<div class="bar"><h1>Tickets</h1><span class="grow"></span>
+   <select class="inp" data-chg="fStatus"><option value="active"${f.status==='active'?' selected':''}>Open tickets</option><option value="all"${f.status==='all'?' selected':''}>All</option>${['Unassigned','Scheduled','In progress','On hold','Complete'].map(s=>opt(s,s,f.status)).join('')}</select>
+   <select class="inp" data-chg="fCust"><option value="">All customers</option>${S.customers.map(c=>opt(c.id,c.name,f.cust)).join('')}</select>
+   <button class="btn pri" data-act="newJob">New ticket</button></div>
+   <div class="list"><div class="jrow jhead"><span>Ticket</span><span>Work</span><span>Customer and site</span><span>Crew</span><span>Dates</span><span>Status</span></div>
+   ${js.map(j=>`<button class="jrow" data-act="openJob" data-id="${j.id}"><span class="mono">${j.id}</span><span><b>${esc(j.title)}</b><br>${ppill(j.priority)}</span>
+    <span>${esc(cust(j.custId).name)}<br><span class="sm muted">${esc(loc(j.locId).name)}</span></span><span>${avs(j.assignees)}</span>
+    <span class="sm">${j.start?fmtD(j.start)+(j.end&&j.end!==j.start?' to '+fmtD(j.end):''):'Not scheduled'}</span><span>${spill(j.status)}</span></button>`).join('')||'<div class="empty">No tickets match.</div>'}</div>`;
+}
+function projectsView(){
+  return `<div class="bar"><h1>Projects</h1><span class="grow"></span><button class="btn pri" data-act="newJob" data-kind="project">New project</button></div>`+
+  S.jobs.filter(j=>j.kind==='project').map(p=>{
+    const bud=p.tasks.reduce((s,t)=>s+t.budget,0),act=jobHrs(p.id),pct=Math.min(100,act/bud*100);
+    return `<div class="card pcard"><div class="bar" style="margin-top:0"><div class="grow"><span class="mono muted">${p.id}</span> <h2 style="display:inline">${esc(p.title)}</h2><div class="sm muted">${esc(cust(p.custId).name)} · ${esc(loc(p.locId).name)} · ${esc(con(p.contractId).name)} · ${fmtD(p.start)} to ${fmtD(p.end)}</div></div>${spill(p.status)}<button class="btn" data-act="openJob" data-id="${p.id}" data-tab="tasks">Open</button></div>
+     <div class="sm" style="margin-bottom:4px">${hrsF(act)} of ${hrsF(bud)} budgeted hours</div><div class="meter${act>bud?' over':''}"><i style="width:${pct}%"></i></div>
+     ${p.tasks.map(t=>{const a=jobHrs(p.id,t.id);return `<div class="trow"><div><b>${esc(t.name)}</b></div><div>${avs(t.assignees)}</div><div class="sm">${t.start?fmtD(t.start)+' to '+fmtD(t.end):'Not scheduled'}</div>
+       <div><div class="meter${a>t.budget?' over':''}"><i style="width:${Math.min(100,a/t.budget*100)}%"></i></div><span class="sm muted">${hrsF(a)} / ${t.budget} h</span></div><div>${spill(t.status)}</div></div>`}).join('')}</div>`}).join('');
+}
+function myWorkView(){
+  const me=S.user;
+  const mine=schedItems().filter(i=>i.assignees.includes(me)&&!i.done);
+  const groups=[['Today',i=>i.start<=S.today&&i.end>=S.today],['Coming up',i=>i.start>S.today]];
+  return `<div class="bar"><h1>My work</h1></div>`+groups.map(([n,fn])=>{const l=mine.filter(fn);
+    return `<h3 style="margin:14px 0 8px">${n}</h3>`+(l.map(i=>{const j=i.job,L=loc(j.locId),mine=jobHrs(j.id)>0;
+      const cl=j.checklist.filter(c=>c.type!=='head'),dn=cl.filter(c=>c.type==='value'?c.val:c.done).length;
+      return `<div class="card pri-${slug(j.priority)}" style="border-left:4px solid var(--pri);margin-bottom:8px"><div class="mono muted">${j.id} ${ppill(j.priority)} ${spill(j.status)}</div>
+       <h2>${esc(i.label)}</h2><div>${esc(cust(j.custId).name)} · ${esc(L.name)}</div><div class="sm muted">${esc(L.addr)}${L.notes?' · '+esc(L.notes):''}</div>
+       ${j.equip&&j.equip.length?`<div class="sm">Equipment: ${eqTags(j.equip)}</div>`:''}<div class="sm" style="margin:6px 0">${fmtD(i.start)} to ${fmtD(i.end)} · crew ${avs(i.assignees)} · ${cl.length?`checklist ${dn}/${cl.length}`:'no checklist'}</div>
+       <button class="btn pri" data-act="openJob" data-id="${j.id}" data-tab="${j.kind==='project'?'time':'overview'}">Open</button> <button class="btn" data-act="openJob" data-id="${j.id}" data-tab="history">Site history</button></div>`}).join('')||'<div class="empty">Nothing here.</div>')}).join('');
+}
+const meId=()=>isOffice()?S.time.emp:S.user;
+function timeForm(px,jobId){
+  const me=meId();
+  const empSel=isOffice()?`<select id="${px}-emp" class="inp">${S.employees.map(e=>opt(e.id,e.name,me)).join('')}</select>`:`<input type="hidden" id="${px}-emp" value="${me}"><div>${esc(emp(me).name)}</div>`;
+  let jobSel='';let j=jobId?job(jobId):null;
+  if(!jobId){
+    const act=S.jobs.filter(x=>x.status!=='Complete');
+    const mine=act.filter(x=>schedItems().some(i=>i.job.id===x.id&&i.assignees.includes(me)));
+    const rest=act.filter(x=>!mine.includes(x));
+    if(!S.time.job||!jb(S.time.job))S.time.job=(mine[0]||act[0]).id;
+    j=jb(S.time.job);
+    const o=x=>opt(x.id,x.id+' · '+x.title,S.time.job);
+    jobSel=`<div class="field"><label for="${px}-job">Ticket, project or shop time</label><select id="${px}-job" class="inp" data-chg="timeJob">${mine.length?`<optgroup label="Assigned to ${esc(emp(me).name.split(' ')[0])}">${mine.map(o).join('')}</optgroup>`:''}<optgroup label="Other open jobs">${rest.map(o).join('')}</optgroup><optgroup label="Not on a job"><option value="SHOP"${S.time.job==='SHOP'?' selected':''}>Shop time (unallocated)</option></optgroup></select></div>`;
+  }
+  const taskSel=j&&j.kind==='project'?`<div class="field"><label for="${px}-task">Task</label><select id="${px}-task" class="inp">${j.tasks.map(t=>opt(t.id,t.name,'')).join('')}</select></div>`:'';
+  return `<div class="card"><div class="fgrid">${jobSel}<div class="field"><label>Person</label>${empSel}</div>
+   <div class="field"><label for="${px}-date">Date</label><input id="${px}-date" type="date" class="inp" value="${S.time.date}"></div>${taskSel}
+   <div class="field"><label for="${px}-hrs">Hours</label><input id="${px}-hrs" type="number" step="0.25" min="0" class="inp" placeholder="0.0"></div>
+   <div class="field"><label for="${px}-type">Pay type</label><select id="${px}-type" class="inp"><option value="ST">Regular</option><option value="OT">Overtime</option></select></div>
+   <div class="field" style="grid-column:1/-1"><label for="${px}-note">What was done</label><input id="${px}-note" class="inp" placeholder="Short note for the office"></div></div>
+   <div class="bar" style="margin-bottom:0"><button class="btn pri" data-act="addTime" data-px="${px}"${jobId?` data-job="${jobId}"`:''}>Add hours</button></div></div>`;
+}
+function timeRows(list,showJob){
+  return `<div class="wrap-x"><table class="tbl"><thead><tr><th>Date</th><th>Person</th>${showJob?'<th>Job</th>':''}<th>Task</th><th class="n">Hours</th><th>Type</th><th>Note</th><th>Status</th><th></th></tr></thead><tbody>
+  ${list.map(t=>{const j=jb(t.jobId),tk=t.taskId?j.tasks.find(x=>x.id===t.taskId):null;const lock=t.status==='approved'||t.status==='exported';
+   return `<tr><td>${fmtDW(t.date)} ${fmtD(t.date)}</td><td>${esc(emp(t.emp).name)}</td>${showJob?`<td>${t.jobId==='SHOP'?'<span class="pill p-warn">Shop time</span> unallocated':`<span class="mono">${t.jobId}</span> ${esc(j.title)}`}</td>`:''}<td>${tk?esc(tk.name):'<span class="muted">General</span>'}</td><td class="n">${hrsF(t.hrs)}</td><td>${t.type==='OT'?'<span class="pill p-warn">OT</span>':'Reg'}</td><td>${esc(t.note)}</td>
+   <td><span class="pill ${t.status==='open'?'':t.status==='submitted'?'p-info':'p-good'}">${t.status}</span></td><td>${lock&&!isOffice()?'':`<button class="btn sm ghost" data-act="delTime" data-id="${t.id}" aria-label="Delete entry">Delete</button>`}</td></tr>`}).join('')||`<tr><td colspan="9" class="muted">No entries.</td></tr>`}${showJob&&list.length?`<tr style="background:var(--surface2)"><td colspan="4"><b>Day total</b></td><td class="n"><b>${hrsF(list.reduce((n,t)=>n+t.hrs,0))}</b></td><td colspan="4" class="sm muted">${hrsF(list.filter(t=>t.jobId!=='SHOP').reduce((n,t)=>n+t.hrs,0))} on jobs · ${hrsF(list.filter(t=>t.jobId==='SHOP').reduce((n,t)=>n+t.hrs,0))} shop</td></tr>`:''}</tbody></table></div>`;
+}
+function timeView(){
+  const me=meId(),wk=mondayOf(S.time.date),days=[...Array(7)].map((_,i)=>addDays(wk,i));
+  const mine=S.times.filter(t=>t.emp===me);
+  const wkEntries=mine.filter(t=>t.date>=wk&&t.date<=days[6]);
+  const openN=wkEntries.filter(t=>t.status==='open').length;
+  const dayList=mine.filter(t=>t.date===S.time.date);
+  return `<div class="bar"><h1>${isOffice()?'Time entry':'My time'}</h1><span class="grow"></span>${isOffice()?`<label class="sm muted">Person <select class="inp" data-chg="timeEmp">${S.employees.map(e=>opt(e.id,e.name,me)).join('')}</select></label>`:''}</div>
+   <div class="bar" style="margin:0"><button class="btn" data-act="tweek" data-n="-7">‹ Prev week</button><b>Week of ${fmtD(wk)}</b><button class="btn" data-act="tweek" data-n="7">Next week ›</button><span class="grow"></span><b>${hrsF(wkEntries.reduce((s,t)=>s+t.hrs,0))} h this week</b><span class="sm muted">${hrsF(wkEntries.filter(t=>t.jobId!=='SHOP').reduce((s,t)=>s+t.hrs,0))} on jobs · ${hrsF(wkEntries.filter(t=>t.jobId==='SHOP').reduce((s,t)=>s+t.hrs,0))} shop</span></div>
+   <div class="days">${days.map(d=>`<button class="day" data-act="pickDay" data-d="${d}" aria-current="${d===S.time.date}"><span class="sm muted">${fmtDW(d)} ${fmtD(d)}</span><b>${hrsF(wkEntries.filter(t=>t.date===d).reduce((s,t)=>s+t.hrs,0))}</b></button>`).join('')}</div>
+   <p class="muted" style="margin:0 0 10px">Every hour goes on a service ticket, a project task, or shop time. The timesheet is built from these entries.</p><div class="stack"><h3>Add hours for ${fmtDW(S.time.date)} ${fmtD(S.time.date)}</h3>${timeForm('tv')}
+   <h3>Entries this day</h3><div class="card">${timeRows(dayList,true)}</div>
+   <div class="bar" style="margin:0"><button class="btn pri" data-act="submitWeek"${openN?'':' disabled'}>Submit week for approval${openN?' ('+openN+' entries)':''}</button><span class="sm muted">${openN?'Entries stay editable until the office approves them.':'Nothing waiting to be submitted this week.'}</span></div></div>`;
+}
+function customersView(){
+  const c=cust(S.custSel),L=S.locations.filter(l=>l.custId===c.id),K=S.contracts.filter(k=>k.custId===c.id);
+  return `<div class="bar"><h1>Customers</h1></div><div class="split"><div class="side">${S.customers.map(x=>`<button data-act="selCust" data-id="${x.id}" aria-current="${x.id===c.id}"><b>${esc(x.name)}</b><div class="sm muted">${S.locations.filter(l=>l.custId===x.id).length} sites · ${S.contracts.filter(k=>k.custId===x.id).length} contracts</div></button>`).join('')}
+   <div class="card stack"><div class="field"><label for="nc-name">New customer</label><input id="nc-name" class="inp" data-enter="addCust"></div><button class="btn" data-act="addCust">Add customer</button></div></div>
+  <div class="stack"><div class="card"><h2>${esc(c.name)}: locations</h2><p class="sm muted">Sites belong to the customer, so any contract can be used at any site.</p>
+   <div class="wrap-x"><table class="tbl"><thead><tr><th>Site</th><th>Address</th><th>Access notes</th></tr></thead><tbody>${L.map(l=>`<tr><td><b>${esc(l.name)}</b></td><td>${esc(l.addr)}</td><td>${esc(l.notes)||'<span class="muted">None</span>'}</td></tr>`).join('')}</tbody></table></div>
+   <div class="fgrid" style="margin-top:10px"><div class="field"><label for="nl-name">Site name</label><input id="nl-name" class="inp"></div><div class="field"><label for="nl-addr">Address</label><input id="nl-addr" class="inp"></div><div class="field"><label for="nl-notes">Access notes</label><input id="nl-notes" class="inp"></div></div>
+   <div class="bar" style="margin-bottom:0"><button class="btn" data-act="addLoc">Add location</button></div></div>
+   ${eqCustomerCard(c)}
+   <h2>Contracts and pricing</h2>
+   <p class="sm muted" style="margin:0">Time and materials bills hourly rates plus a materials markup. Cost plus bills labor at the hourly rates, and materials and subcontractors at cost plus a markup shown as its own line. Fixed price bills the job's agreed price. Any single job can also be switched to fixed price on its ticket.</p>
+   ${K.map(k=>`<div class="card"><div class="bar" style="margin:0 0 8px"><b>${esc(k.name)}</b><span class="pill p-info">${esc(k.type)}</span>${k.pw?'<span class="pill p-acc">Prevailing wage</span>':''}<span class="grow"></span><span class="sm muted">${fmtD(k.start)} to ${fmtD(k.end)} · used on ${S.jobs.filter(j=>j.contractId===k.id).length} jobs</span></div>
+    <div class="fgrid">${['Foreman','Journeyman','Apprentice','Helper'].map(r=>`<div class="field"><label>${r} $/h</label><input type="number" step="0.01" class="inp" value="${k.rates[r]}" data-chg="conRate" data-id="${k.id}" data-f="${r}"></div>`).join('')}
+    <div class="field"><label>Overtime multiplier</label><input type="number" step="0.1" class="inp" value="${k.ot}" data-chg="conNum" data-id="${k.id}" data-f="ot"></div>
+    <div class="field"><label>Materials markup %</label><input type="number" step="1" class="inp" value="${k.markup}" data-chg="conNum" data-id="${k.id}" data-f="markup"></div>
+    <div class="field"><label>Trip charge $</label><input type="number" step="1" class="inp" value="${k.trip}" data-chg="conNum" data-id="${k.id}" data-f="trip"></div>
+    <div class="field"><label>Billing method</label><select class="inp" data-chg="conMethod" data-id="${k.id}">${['tm','costplus','fixed'].map(x=>opt(x,METHOD[x],k.method)).join('')}</select></div>
+    <div class="field"><label>Subcontractor markup %</label><input type="number" step="1" class="inp" value="${k.adS}" data-chg="conNum" data-id="${k.id}" data-f="adS"></div></div>${pmEditor(k)}</div>`).join('')||'<div class="empty">No contracts yet.</div>'}
+   <details class="card"><summary><b>Add a contract</b></summary><div class="fgrid" style="margin-top:10px">
+    <div class="field"><label for="nk-name">Contract name</label><input id="nk-name" class="inp"></div><div class="field"><label for="nk-type">Type</label><select id="nk-type" class="inp"><option>Service</option><option>Project</option><option>Emergency</option></select></div>
+    ${[['F','Foreman'],['J','Journeyman'],['A','Apprentice'],['H','Helper']].map(r=>`<div class="field"><label for="nk-${r[0]}">${r[1]} $/h</label><input id="nk-${r[0]}" type="number" class="inp"></div>`).join('')}
+    <div class="field"><label for="nk-ot">OT multiplier</label><input id="nk-ot" type="number" step="0.1" class="inp" value="1.5"></div><div class="field"><label for="nk-mk">Materials markup %</label><input id="nk-mk" type="number" class="inp" value="15"></div><div class="field"><label for="nk-trip">Trip charge $</label><input id="nk-trip" type="number" class="inp" value="0"></div>
+    <div class="field"><label for="nk-method">Billing method</label><select id="nk-method" class="inp">${['tm','costplus','fixed'].map(x=>opt(x,METHOD[x],'tm')).join('')}</select></div><div class="field"><label for="nk-ads">Subcontractor markup %</label><input id="nk-ads" type="number" class="inp" value="10"></div>
+    <div class="field"><label for="nk-pw">Prevailing wage</label><select id="nk-pw" class="inp"><option value="1">Yes</option><option value="0">No</option></select></div></div>
+    <div class="bar" style="margin-bottom:0"><button class="btn" data-act="addContract">Add contract</button></div></details></div></div>`;
+}
+function checklistsView(){
+  const t=S.templates.find(x=>x.id===S.tplSel)||S.templates[0];
+  const used=S.jobs.length;
+  return `<div class="bar"><h1>Checklists</h1><span class="grow"></span><button class="btn pri" data-act="openImport" data-target="lib">Import checklist</button></div>
+  <div class="split"><div class="side">${S.templates.map(x=>`<button data-act="selTpl" data-id="${x.id}" aria-current="${x.id===t.id}"><b>${esc(x.name)}</b><div class="sm muted">${x.items.filter(i=>i.type!=='head').length} items</div></button>`).join('')}</div>
+  <div class="card"><div class="bar" style="margin-top:0"><input class="inp grow" value="${esc(t.name)}" data-chg="tplName" aria-label="Template name"><button class="btn sm" data-act="delTpl">Delete template</button></div>
+   ${t.items.map((i,n)=>i.type==='head'?`<div class="cl-head">${esc(i.text)} <button class="btn sm ghost" data-act="delTplItem" data-n="${n}">Remove</button></div>`:`<div class="cl-row"><span class="t">${esc(i.text)}</span>${i.type==='value'?'<span class="pill p-info">enter reading</span>':''}<button class="btn sm ghost" data-act="delTplItem" data-n="${n}">Remove</button></div>`).join('')}
+   <div class="bar"><input id="ti-text" class="inp grow" placeholder="New item. Start with # for a section heading, end with |value for a reading" data-enter="addTplItem"><button class="btn" data-act="addTplItem">Add</button></div>
+   <p class="sm muted">Apply a template from any ticket or project's Checklist tab. Each job gets its own copy, so editing a job's list never changes the template.</p></div></div>`;
+}
+function partsView(){
+  const rows=[];S.jobs.forEach(j=>j.parts.forEach(p=>rows.push({j,p})));
+  const list=S.partFilter==='missing'?rows.filter(r=>needsInv(r.p)&&!r.p.invoice):rows;
+  const miss=rows.filter(r=>needsInv(r.p)&&!r.p.invoice).length;
+  return `<div class="bar"><h1>Parts and invoices</h1><span class="grow"></span><select class="inp" data-chg="partFilter">${opt('all','All parts',S.partFilter)}${opt('missing','Purchased, invoice missing ('+miss+')',S.partFilter)}</select></div>
+  <div class="card wrap-x"><table class="tbl"><thead><tr><th>Job</th><th>Part</th><th class="n">Qty</th><th class="n">Cost</th><th>Source</th><th>Bought by</th><th>Invoice</th></tr></thead><tbody>
+  ${list.map(({j,p})=>`<tr><td><button class="btn sm" data-act="openJob" data-id="${j.id}" data-tab="parts">${j.id}</button></td><td>${esc(p.desc)}</td><td class="n">${p.qty}</td><td class="n">${money(p.qty*p.cost)}</td><td>${esc(p.src)}${p.vendor?'<div class="sm muted">'+esc(p.vendor)+'</div>':''}</td><td>${p.by?esc(emp(p.by).name)+(p.reimb?' <span class="pill p-warn">reimburse</span>':''):'—'}</td>
+  <td>${p.invoice?`<span class="pill p-good">${esc(p.invoice.name)}</span>`:!needsInv(p)?'<span class="muted">n/a ('+(p.src==='Stock'?'stock':'subcontractor')+')</span>':'<span class="pill p-crit">Missing</span>'}</td></tr>`).join('')||'<tr><td colspan="7" class="muted">Nothing to show.</td></tr>'}</tbody></table></div>`;
+}
+const okSt=()=>S.ts.incl==='approved'?['approved']:['approved','submitted'];
+const byDate=(a,b)=>a.date.localeCompare(b.date)||emp(a.emp).name.localeCompare(emp(b.emp).name);
+function tsEntries(){const t=S.ts,ok=okSt();return S.times.filter(x=>x.date>=t.from&&x.date<=t.to&&(ok.includes(x.status)||(t.again&&x.status==='exported'))).sort(byDate)}
+function sheetEntries(){const ok=okSt().concat('exported');return S.times.filter(x=>x.date>=S.ts.from&&x.date<=S.ts.to&&ok.includes(x.status)).sort(byDate)}
+function tsDays(){const t=S.ts,n=Math.min(14,diffDays(t.from,t.to)+1);return [...Array(Math.max(1,n))].map((_,i)=>addDays(t.from,i))}
+const isPW=t=>{const j=jb(t.jobId),c=j&&con(j.contractId);return !!(c&&c.pw)};
+const sumH=(l,f)=>l.filter(f||(()=>true)).reduce((s,x)=>s+x.hrs,0);
+function workLabel(t){if(t.jobId==='SHOP')return 'Shop time (unallocated)';const j=job(t.jobId),tk=t.taskId?j.tasks.find(x=>x.id===t.taskId):null;return j.id+' '+j.title+(tk?' / '+tk.name:'')}
+function missingDays(id,days){return days.filter(d=>{const w=pd(d).getDay();return d<=S.today&&w>0&&w<6&&!S.times.some(x=>x.emp===id&&x.date===d)}).length}
+const pst=s=>`<span class="pill ${s==='open'?'':s==='submitted'?'p-info':'p-good'}">${s}</span>`;
+function techSheet(e,list,days){
+  const rows={};
+  list.forEach(t=>{const k=t.jobId+'|'+(t.taskId||'')+'|'+t.type;const r=rows[k]=rows[k]||{t,h:{}};r.h[t.date]=(r.h[t.date]||0)+t.hrs});
+  const keys=Object.keys(rows).sort((a,b)=>(a.startsWith('SHOP')?1:0)-(b.startsWith('SHOP')?1:0)||a.localeCompare(b));
+  const reg=sumH(list,x=>x.type==='ST'),ot=sumH(list,x=>x.type==='OT'),shop=sumH(list,x=>x.jobId==='SHOP'),pw=sumH(list,isPW);
+  return `<div class="card"><div class="bar" style="margin:0 0 8px"><h2>${esc(e.name)}</h2><span class="muted">${esc(e.cls)}</span><span class="grow"></span>
+   <span class="pill">Regular ${hrsF(reg)}</span><span class="pill ${ot?'p-warn':''}">Overtime ${hrsF(ot)}</span><span class="pill p-warn">Shop ${hrsF(shop)}</span><span class="pill p-acc">Prevailing wage ${hrsF(pw)}</span><b>${hrsF(reg+ot)} h total</b></div>
+   <div class="wrap-x"><table class="tbl"><thead><tr><th>Ticket, project task or shop</th>${days.map(d=>`<th class="n">${fmtDW(d)} ${pd(d).getDate()}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>
+   ${keys.map(k=>{const r=rows[k];return `<tr><td>${r.t.jobId==='SHOP'?'<span class="pill p-warn">Shop</span> Unallocated':'<span class="mono">'+esc(workLabel(r.t).split(' ')[0])+'</span> '+esc(workLabel(r.t).split(' ').slice(1).join(' '))}${r.t.type==='OT'?' <span class="pill p-warn">OT</span>':''}</td>${days.map(d=>`<td class="n">${r.h[d]?hrsF(r.h[d]):'<span class="muted">·</span>'}</td>`).join('')}<td class="n"><b>${hrsF(Object.values(r.h).reduce((s,x)=>s+x,0))}</b></td></tr>`}).join('')}
+   <tr><td><b>Daily total</b></td>${days.map(d=>`<td class="n"><b>${hrsF(sumH(list,x=>x.date===d))||'·'}</b></td>`).join('')}<td class="n"><b>${hrsF(reg+ot)}</b></td></tr></tbody></table></div></div>`;
+}
+function timesheetsView(){
+  const t=S.ts,days=tsDays();
+  const inr=S.times.filter(x=>x.date>=t.from&&x.date<=t.to);
+  const ems=S.employees.filter(e=>inr.some(x=>x.emp===e.id));
+  const openN=inr.filter(x=>x.status==='open').length,subN=inr.filter(x=>x.status==='submitted').length;
+  const sheet=sheetEntries();
+  return `<div class="bar"><h1>Timesheets</h1></div>
+  <p class="muted" style="margin:0 0 10px">Each technician's timesheet is built from the hours they logged. Every hour sits on a ticket, a project task, or shop time.</p>
+  <div class="card"><div class="fgrid"><div class="field"><label for="ts-from">From</label><input id="ts-from" type="date" class="inp" value="${t.from}" data-chg="tsRange"></div><div class="field"><label for="ts-to">To</label><input id="ts-to" type="date" class="inp" value="${t.to}" data-chg="tsRange"></div></div></div>
+  ${openN?`<div class="banner" style="background:var(--warn-soft);color:var(--warn)">${openN} entries in this range have not been submitted by the technician yet.</div>`:''}
+  <div class="bar"><h3>Review</h3><span class="grow"></span>${subN?`<button class="btn pri" data-act="approveRange">Approve ${subN} submitted entries</button>`:'<span class="sm muted">No submitted entries waiting for approval.</span>'}</div>
+  <div class="scroll-x"><table class="tbl"><thead><tr><th>Person</th>${days.map(d=>`<th class="n">${fmtDW(d)} ${pd(d).getDate()}</th>`).join('')}<th class="n">Jobs</th><th class="n">Shop</th><th class="n">OT</th><th class="n">Total</th><th>Status</th></tr></thead><tbody>
+  ${ems.map(e=>{const l=inr.filter(x=>x.emp===e.id),st=[...new Set(l.map(x=>x.status))],mi=missingDays(e.id,days);
+   return `<tr><td><b>${esc(e.name)}</b></td>${days.map(d=>{const h=sumH(l,x=>x.date===d);return `<td class="n">${h?hrsF(h):'<span class="muted">·</span>'}</td>`}).join('')}<td class="n">${hrsF(sumH(l,x=>x.jobId!=='SHOP'))}</td><td class="n">${hrsF(sumH(l,x=>x.jobId==='SHOP'))}</td><td class="n">${hrsF(sumH(l,x=>x.type==='OT'))}</td><td class="n"><b>${hrsF(sumH(l))}</b></td><td>${st.map(pst).join(' ')}${mi?` <span class="pill p-crit">${mi} weekday${mi>1?'s':''} with no hours</span>`:''}</td></tr>`}).join('')||`<tr><td colspan="${days.length+6}" class="muted">No time in this range.</td></tr>`}</tbody></table></div>
+  <div class="bar"><h3>Technician timesheets</h3><span class="grow"></span><span class="sm muted">${t.incl==='approved'?'Approved':'Approved and submitted'} hours only</span></div>
+  <div class="stack">${S.employees.filter(e=>sheet.some(x=>x.emp===e.id)).map(e=>techSheet(e,sheet.filter(x=>x.emp===e.id),days)).join('')||'<div class="empty">Nothing approved yet. Approve submitted entries above and the technician sheets appear here.</div>'}</div>
+  <div class="bar"><h3>Export</h3></div>
+  <div class="card stack"><div class="fgrid"><div class="field"><label for="ts-fmt">Format</label><select id="ts-fmt" class="inp" data-chg="tsFmt">${opt('pay','Payroll sheet: one row per technician',t.fmt)}${opt('detail','Timesheet detail: one row per entry',t.fmt)}${opt('qbo','QuickBooks Online time CSV (later)',t.fmt)}</select></div>
+  <div class="field"><label for="ts-incl">Include</label><select id="ts-incl" class="inp" data-chg="tsIncl">${opt('approved','Approved entries only',t.incl)}${opt('sub','Approved and submitted',t.incl)}</select></div></div>
+  <label><input type="checkbox" data-chg="tsAgain"${t.again?' checked':''}> Include entries already exported</label>
+  <div class="bar" style="margin:0"><button class="btn pri" data-act="genExport">Generate export (${tsEntries().length} entries)</button>${t.out?`<button class="btn" data-act="copyOut">Copy to clipboard</button><button class="btn" data-act="markExported">Mark ${t.ids.length} entries as exported</button>`:''}</div>
+  ${t.out?`<textarea id="ts-out" class="out" readonly aria-label="Export text">${esc(t.out)}</textarea><p class="sm muted">Paste into a spreadsheet to key into payroll. In the full app this is a file download.</p>`:''}</div>`;
+}
+function exportText(list){
+  const q=v=>/[",\n]/.test(v)?'"'+String(v).replace(/"/g,'""')+'"':String(v);
+  const mdy=d=>{const [y,m,dd]=d.split('-');return m+'/'+dd+'/'+y};
+  const shop=t=>t.jobId==='SHOP';
+  const item=t=>'Labor:'+emp(t.emp).cls+(t.type==='OT'?' Overtime':' Regular');
+  const cj=t=>{if(shop(t))return 'Shop time';const j=job(t.jobId);return cust(j.custId).name+':'+j.id+' '+j.title};
+  const note=t=>{const j=jb(t.jobId),c=con(j.contractId),tk=t.taskId?j.tasks.find(x=>x.id===t.taskId):null;return (shop(t)?'SHOP':j.id)+(tk?' / '+tk.name:'')+(c&&c.pw?' [PW]':'')+(t.note?' - '+t.note:'')};
+  const f=S.ts.fmt,days=tsDays();
+  if(f==='pay'){
+    const ids=[...new Set(list.map(t=>t.emp))];
+    return [['Employee','Class'].concat(days.map(d=>mdy(d).slice(0,5)),['Regular','Overtime','Shop (in regular)','Prevailing wage','Total']).join(',')].concat(ids.map(id=>{const l=list.filter(t=>t.emp===id);
+      return [emp(id).name,emp(id).cls].concat(days.map(d=>{const h=sumH(l,x=>x.date===d);return h?hrsF(h):''}),[hrsF(sumH(l,x=>x.type==='ST')),hrsF(sumH(l,x=>x.type==='OT')),hrsF(sumH(l,shop)),hrsF(sumH(l,isPW)),hrsF(sumH(l))]).map(q).join(',')})).join('\n');
+  }
+  if(f==='detail')return ['Employee,Class,Date,Work,Customer,Pay type,Hours,Prevailing wage,Note'].concat(list.map(t=>[emp(t.emp).name,emp(t.emp).cls,mdy(t.date),workLabel(t),shop(t)?'':cust(job(t.jobId).custId).name,t.type==='OT'?'Overtime':'Regular',t.hrs.toFixed(2),isPW(t)?'Yes':'No',t.note].map(q).join(','))).join('\n');
+  if(f==='iif'){
+    const hm=h=>Math.floor(h)+':'+String(Math.round((h%1)*60)).padStart(2,'0');
+    return ['!TIMEACT\tDATE\tJOB\tEMP\tITEM\tPITEM\tDURATION\tPROJ\tNOTE\tXFERTOPAYROLL\tBILLINGSTATUS'].concat(list.map(t=>['TIMEACT',mdy(t.date),cj(t),emp(t.emp).name,item(t),'',hm(t.hrs),'',note(t),'N',shop(t)?'0':'1'].join('\t'))).join('\n');
+  }
+  return ['Date,Employee,Customer:Job,Service Item,Hours,Billable,Notes'].concat(list.map(t=>[mdy(t.date),emp(t.emp).name,cj(t),item(t),t.hrs.toFixed(2),shop(t)?'No':'Yes',note(t)].map(q).join(','))).join('\n');
+}
+const fl=n=>Math.floor(n*100+1e-6)/100,r2=n=>Math.round(n*100)/100;
+const clLeft=j=>j.checklist.filter(c=>c.type!=='head'&&(c.type==='value'?!c.val:!c.done)).length;
+const METHOD={tm:'Time and materials',costplus:'Cost plus',fixed:'Fixed price',pm:'PM pricing'};
+const methodOf=j=>{const c=con(j.contractId);if(j.billAs==='fixed')return 'fixed';if(j.billAs==='tm')return 'tm';if(j.priority==='PM'&&c&&c.pm&&c.pm.basis!=='none')return 'pm';return (c&&c.method==='fixed')?'fixed':(c?c.method:'tm')};
+const fixedRemaining=j=>Math.max(0,(j.fixedPrice||0)-(j.billedFixed||0));
+const eligTime=j=>S.times.filter(x=>x.jobId===j.id&&!x.invId&&(x.status==='approved'||x.status==='exported'));
+const pendTime=j=>S.times.filter(x=>x.jobId===j.id&&!x.invId&&(x.status==='open'||x.status==='submitted'));
+function jobCost(j){const c=con(j.contractId);const labor=S.times.filter(x=>x.jobId===j.id).reduce((s,x)=>s+x.hrs*(emp(x.emp).cost||0)*(x.type==='OT'?c.ot:1),0);const parts=j.parts.reduce((s,p)=>s+p.qty*p.cost,0);return {labor,parts,total:labor+parts}}
+function calcLines(j,est){
+  const c=con(j.contractId),m=methodOf(j),L=[];
+  if(m==='fixed'){
+    if(est)return L;
+    const rem=fixedRemaining(j),amt=fl((S.bill.jobId===j.id&&S.bill.fixedNow!=null)?(+S.bill.fixedNow||0):rem);
+    return rem>0&&amt>0?[{kind:'fixed',item:'Fixed Price Work',desc:'Fixed price: '+j.title,qty:1,rate:amt,amt}]:[];
+  }
+  if(m==='pm'){
+    if(!est&&j.pmBilled)return [];
+    const pm=c.pm;
+    if(pm.basis==='location'){const p=fl(pm.locPrices[j.locId]==null?(pm.locDefault||0):pm.locPrices[j.locId]),tg=(j.equip||[]).map(i=>eqOf(i).tag);L.push({kind:'pm',item:'Preventive Maintenance',desc:'Preventive maintenance: '+loc(j.locId).name+(tg.length?' ('+tg.join(', ')+')':''),qty:1,rate:p,amt:p,noPrice:!p})}
+    else{const g2={};(j.equip||[]).forEach(id=>{const q=eqOf(id);(g2[q.type]=g2[q.type]||[]).push(q.tag)});Object.keys(g2).forEach(t=>{const p=fl(pm.eqPrices[t]||0);L.push({kind:'pm',item:'PM - '+t,desc:'Preventive maintenance, '+t+' ('+g2[t].join(', ')+')',qty:g2[t].length,rate:p,amt:fl(p*g2[t].length),noPrice:!p})})}
+    if(j.pmParts)(est?j.parts:j.parts.filter(p=>!p.invId)).forEach(p=>{const rate=fl(p.cost*(1+c.markup/100));L.push({kind:'part',item:'Materials',desc:p.desc+(p.vendor?' ('+p.vendor+')':''),qty:p.qty,rate,amt:fl(p.qty*rate),pid:p.id,noInv:needsInv(p)&&!p.invoice})});
+    return L;
+  }
+  const tl=est?S.times.filter(x=>x.jobId===j.id):eligTime(j),pl=est?j.parts:j.parts.filter(p=>!p.invId),g={};
+  tl.forEach(x=>{const e=emp(x.emp),tk=x.taskId?j.tasks.find(t=>t.id===x.taskId).name:'Labor',k=tk+'|'+e.cls+'|'+x.type;const r=g[k]=g[k]||{task:tk,cls:e.cls,type:x.type,h:0,cost:0,ids:[]};r.h+=x.hrs;r.cost+=x.hrs*(e.cost||0)*(x.type==='OT'?c.ot:1);r.ids.push(x.id)});
+  Object.values(g).sort((a,b)=>a.task.localeCompare(b.task)||a.cls.localeCompare(b.cls)).forEach(r=>{
+    const ot=r.type==='OT',pre=r.task!=='Labor'?r.task+': ':'',rate=fl(c.rates[r.cls]*(ot?c.ot:1));
+    L.push({kind:'labor',item:'Labor - '+r.cls+(ot?' Overtime':''),desc:pre+r.cls+(ot?' overtime':' regular')+' labor'+(c.pw?' (prevailing wage)':''),qty:r.h,rate,amt:fl(r.h*rate),ids:r.ids})});
+  let matCost=0,subCost=0,subAmt=0;const subIds=[];
+  pl.forEach(p=>{const cost=p.qty*p.cost,v=p.vendor?' ('+p.vendor+')':'';
+    if(p.src==='Subcontractor'){subCost+=cost;subAmt+=m==='costplus'?cost:cost*(1+c.adS/100);subIds.push(p.id);return}
+    matCost+=cost;const ni=needsInv(p)&&!p.invoice;
+    if(m==='costplus')L.push({kind:'part',item:'Materials',desc:p.desc+v,qty:p.qty,rate:fl(p.cost),amt:fl(p.qty*fl(p.cost)),pid:p.id,noInv:ni});
+    else{const rate=fl(p.cost*(1+c.markup/100));L.push({kind:'part',item:'Materials',desc:p.desc+v,qty:p.qty,rate,amt:fl(p.qty*rate),pid:p.id,noInv:ni})}});
+  if(subIds.length)L.push({kind:'sub',item:'Subcontractor',desc:'Subcontractor work',qty:1,rate:fl(subAmt),amt:fl(subAmt),pids:subIds});
+  if(m==='costplus'&&matCost>0)L.push({kind:'partadd',item:'Materials Markup',desc:'Materials markup ('+c.markup+'% of cost)',qty:1,rate:fl(matCost*c.markup/100),amt:fl(matCost*c.markup/100)});
+  if(m==='costplus'&&subCost>0)L.push({kind:'subadd',item:'Subcontractor Markup',desc:'Subcontractor markup ('+c.adS+'% of cost)',qty:1,rate:fl(subCost*c.adS/100),amt:fl(subCost*c.adS/100)});
+  if((m==='tm'||m==='costplus')&&j.kind==='ticket'&&j.trip&&(est||!j.tripBilled)&&c.trip>0)L.push({kind:'trip',item:'Trip Charge',desc:'Trip charge',qty:1,rate:fl(c.trip),amt:fl(c.trip)});
+  return L;
+}
+const invLines=j=>calcLines(j,false);
+const invTotals=L=>{const sub=r2(L.reduce((s,l)=>s+l.amt,0)),mat=r2(L.filter(l=>l.kind==='part'||l.kind==='partadd').reduce((s,l)=>s+l.amt,0)),tax=fl(mat*(+S.bill.tax||0)/100);return {sub,tax,total:r2(sub+tax)}};
+const dueOf=()=>addDays(S.bill.date,parseInt(S.bill.terms.replace(/\D/g,''))||0);
+function estimateCard(j){
+  const c=con(j.contractId),m=methodOf(j),cost=jobCost(j),L=calcLines(j,true),sub=r2(L.reduce((s,l)=>s+l.amt,0));
+  let body='';
+  if(m==='fixed'){
+    const pr=j.fixedPrice||0,bd=j.billedFixed||0;
+    body=`<table class="tbl"><tbody><tr><td>Fixed price</td><td class="n">${pr?money(pr):'<span class="pill p-crit">Not set</span>'}</td></tr><tr><td>Billed to date</td><td class="n">${money(bd)}</td></tr><tr><td>Remaining to bill</td><td class="n"><b>${money(fixedRemaining(j))}</b></td></tr>
+     <tr><td>Your cost to date (labor ${money(cost.labor)} + parts ${money(cost.parts)})</td><td class="n">${money(cost.total)}</td></tr><tr><td>Margin if fully billed</td><td class="n">${pr?money(pr-cost.total)+' ('+Math.round((pr-cost.total)/pr*100)+'%)':'—'}</td></tr></tbody></table>`;
+  }else{
+    const tot=sub;
+    body=`<table class="tbl"><tbody>${L.map(l=>`<tr><td>${esc(l.desc)}</td><td class="n">${hrsF(l.qty)}${l.kind==='labor'?' h':''} × ${money(l.rate)}</td><td class="n">${money(l.amt)}</td></tr>`).join('')||'<tr><td colspan="3" class="muted">No hours or parts yet.</td></tr>'}
+     <tr><td><b>Total to date</b></td><td></td><td class="n"><b>${money(tot)}</b></td></tr><tr><td>Your cost to date</td><td></td><td class="n">${money(cost.total)}</td></tr><tr><td>Margin</td><td></td><td class="n">${tot?money(tot-cost.total)+' ('+Math.round((tot-cost.total)/tot*100)+'%)':'—'}</td></tr></tbody></table>`;
+  }
+  return `<div class="card"><div class="bar" style="margin:0 0 6px"><h2>Billing</h2><span class="pill p-info">${METHOD[m]}</span><span class="pill">${esc(c.name)}</span>${c.pw?'<span class="pill p-acc">Prevailing wage</span>':''}</div>
+   <div class="fgrid" style="margin-bottom:8px"><div class="field"><label>Bill this job as</label><select class="inp" data-chg="jobField" data-f="billAs"><option value="">Follow contract (${METHOD[c.method]})</option><option value="fixed"${j.billAs==='fixed'?' selected':''}>Fixed price</option><option value="tm"${j.billAs==='tm'?' selected':''}>Time and materials (ignore PM pricing)</option></select></div>
+   ${m==='fixed'?`<div class="field"><label>Fixed price $</label><input type="number" step="0.01" class="inp" value="${j.fixedPrice||''}" data-chg="jobPrice"></div>`:''}${m==='pm'?`<label class="sm"><input type="checkbox" data-chg="jobPmParts"${j.pmParts?' checked':''}> Also bill parts used (at contract markup)</label>`:''}</div>${body}
+   <div class="bar" style="margin:8px 0 0"><button class="btn" data-act="prepInvoice" data-id="${j.id}">Prepare invoice</button><span class="sm muted">${m==='pm'?'PM price comes from the contract: '+(c.pm.basis==='location'?'one price per location.':'a price per piece of equipment serviced.')+' Labor is included.':m==='tm'?'Hourly rates, materials and subcontractor markup and trip charge come from the contract.':m==='costplus'?'Labor at the contract hourly rates. Materials and subcontractors at cost plus the contract markup.':'Bills the agreed price, in one invoice or in stages.'}</span></div></div>`;
+}
+function billingView(){
+  if(S.bill.jobId)return invoiceBuilder();
+  const rows=S.jobs.map(j=>({j,m:methodOf(j),L:invLines(j),p:pendTime(j)})).filter(r=>r.m==='pm'?((r.j.status==='Complete'||r.j.status==='In progress')&&!r.j.pmBilled):r.m==='fixed'?((r.j.status==='Complete'||r.j.status==='In progress'||S.times.some(x=>x.jobId===r.j.id))&&(!r.j.fixedPrice||fixedRemaining(r.j)>0)):(r.L.length||r.p.length));
+  return `<div class="bar"><h1>Billing</h1></div><p class="muted" style="margin:0 0 10px">Each job bills the way its contract says: time and materials, cost plus, or fixed price. Prepare an invoice, then import it into QuickBooks.</p>
+  <details class="card" style="margin-bottom:12px"><summary><b>Labor cost rates</b> <span class="sm muted">used for margin only, never shown on invoices</span></summary><div class="fgrid" style="margin-top:10px">${S.employees.map(e=>`<div class="field"><label>${esc(e.name)} $/h loaded</label><input type="number" step="0.01" class="inp" value="${e.cost}" data-chg="empCost" data-id="${e.id}"></div>`).join('')}</div></details>
+  <div class="card wrap-x"><table class="tbl"><thead><tr><th>Job</th><th>Customer and contract</th><th class="n">Hours</th><th class="n">Ready to bill</th><th>Heads up</th><th></th></tr></thead><tbody>
+  ${rows.map(({j,m,L,p})=>{const tot=invTotals(L).total,hrs=L.filter(l=>l.kind==='labor').reduce((s,l)=>s+l.qty,0),nv=L.filter(l=>l.noInv).length,ph=p.reduce((s,x)=>s+x.hrs,0);
+   const hu=m==='pm'?pmHeads(j,L):m==='fixed'?(!j.fixedPrice?'<span class="pill p-crit">Price not set</span>':`<span class="sm muted">${money(j.billedFixed||0)} of ${money(j.fixedPrice)} billed</span>`):`${ph?`<span class="pill p-warn">${hrsF(ph)} h not approved</span> `:''}${nv?`<span class="pill p-crit">${nv} vendor invoice${nv>1?'s':''} missing</span>`:''}${!ph&&!nv?'<span class="muted">Clear</span>':''}`;
+   return `<tr><td><span class="mono">${j.id}</span> ${esc(j.title)}<div>${spill(j.status)}</div></td><td>${esc(cust(j.custId).name)}<div class="sm muted">${esc(con(j.contractId).name)} <span class="pill p-info">${METHOD[m]}</span></div></td><td class="n">${m==='fixed'||m==='pm'?'—':hrsF(hrs)}</td><td class="n"><b>${money(m==='fixed'?fixedRemaining(j):tot)}</b></td>
+   <td>${hu}</td><td><button class="btn pri sm" data-act="prepInvoice" data-id="${j.id}"${(m==='fixed'?fixedRemaining(j)>0:L.length)?'':' disabled'}>Prepare invoice</button></td></tr>`}).join('')||'<tr><td colspan="6" class="muted">Nothing unbilled.</td></tr>'}</tbody></table></div>
+  <div class="bar"><h3>Invoices prepared</h3></div><div class="card wrap-x"><table class="tbl"><thead><tr><th>Invoice</th><th>Date</th><th>Job</th><th>Customer</th><th class="n">Total</th></tr></thead><tbody>
+  ${S.invoices.map(i=>`<tr><td class="mono">${esc(i.no)}</td><td>${fmtD(i.date)}</td><td>${esc(i.jobId)}</td><td>${esc(i.cust)}</td><td class="n">${money(i.total)}</td></tr>`).join('')||'<tr><td colspan="5" class="muted">None yet.</td></tr>'}</tbody></table></div>`;
+}
+function invoiceBuilder(){
+  const b=S.bill,j=job(b.jobId),c=con(j.contractId),m=methodOf(j),L=invLines(j),T=invTotals(L),L0=loc(j.locId),cost=jobCost(j);
+  const pend=(m==='fixed'||m==='pm')?[]:pendTime(j),nv=L.filter(l=>l.noInv).length,cl=j.checklist.filter(x=>x.type!=='head'),cd=cl.filter(x=>x.type==='value'?x.val:x.done).length;
+  const notes=[...new Set(S.times.filter(x=>x.jobId===j.id&&x.note&&(m==='fixed'||m==='pm'||!x.invId)&&(x.status==='approved'||x.status==='exported')).sort((a,b)=>a.date.localeCompare(b.date)).map(x=>fmtD(x.date)+': '+x.note))];
+  const warn=[];
+  if(m==='fixed'&&!j.fixedPrice)warn.push('No fixed price is set on this job. Set it on the ticket first.');
+  if(m==='pm'){if(c.pm.basis==='equipment'&&!(j.equip||[]).length)warn.push('No equipment is selected on this ticket, so there is nothing to price. Mark the units serviced on the ticket.');L.filter(l=>l.noPrice).forEach(l=>warn.push('No PM price is set for '+l.item.replace('PM - ','')+' in this contract.'))}
+  if(pend.length)warn.push(hrsF(pend.reduce((s,x)=>s+x.hrs,0))+' h on this job are not approved yet and are left off.');
+  if(nv)warn.push(nv+' purchased part'+(nv>1?'s have':' has')+' no vendor invoice attached.');
+  if(cl.length&&cd<cl.length)warn.push('Checklist is '+cd+' of '+cl.length+' complete.'+(j.override?' Closed by the office anyway. Reason: '+j.override.reason:''));
+  const lab=L.filter(l=>l.kind==='labor').reduce((s,l)=>s+l.qty,0),pr=j.fixedPrice||0,bd=j.billedFixed||0;
+  return `<div class="bar"><button class="btn" data-act="billBack">‹ Back to billing</button><h1>Invoice for ${esc(j.id)}</h1><span class="pill p-info">${METHOD[m]}</span></div>
+  ${warn.map(w=>`<div class="banner" style="background:var(--warn-soft);color:var(--warn)">${esc(w)}</div>`).join('')}
+  <div class="card stack"><div class="fgrid"><div class="field"><label for="bl-no">Invoice number</label><input id="bl-no" class="inp" value="${esc(b.no)}" data-chg="billField" data-f="no"></div>
+   <div class="field"><label for="bl-date">Invoice date</label><input id="bl-date" type="date" class="inp" value="${b.date}" data-chg="billField" data-f="date"></div>
+   <div class="field"><label for="bl-terms">Terms</label><select id="bl-terms" class="inp" data-chg="billField" data-f="terms">${['Net 15','Net 30','Net 45','Net 60'].map(t=>opt(t,t,b.terms)).join('')}</select></div>
+   <div class="field"><label for="bl-po">Customer PO or reference</label><input id="bl-po" class="inp" value="${esc(b.po)}" data-chg="billField" data-f="po"></div>
+   <div class="field"><label for="bl-tax">Sales tax on materials %</label><input id="bl-tax" type="number" step="0.1" class="inp" value="${b.tax}" data-chg="billField" data-f="tax"></div>
+   ${m==='fixed'?`<div class="field"><label for="bl-fx">Amount to bill on this invoice $</label><input id="bl-fx" type="number" step="0.01" class="inp" value="${b.fixedNow}" data-chg="billField" data-f="fixedNow"></div>`:''}</div>
+   <div class="sm muted">Internal, not on the invoice: your cost to date is ${money(cost.total)} (labor ${money(cost.labor)}, parts ${money(cost.parts)}).${m==='fixed'&&pr?` Margin if fully billed ${money(pr-cost.total)}.`:''}</div></div>
+  <div class="inv" style="margin-top:14px"><div class="bar" style="margin:0 0 12px;align-items:flex-start"><div class="grow"><h2>INVOICE</h2><div class="muted sm">Your Company Name · remit-to address</div></div><div class="sm" style="text-align:right"><b class="mono">${esc(b.no)}</b><br>Date ${fmtD(b.date)}<br>Due ${fmtD(dueOf())} (${esc(b.terms)})</div></div>
+   <div class="grid2" style="margin-bottom:12px"><div><div class="lbl">Bill to</div><b>${esc(cust(j.custId).name)}</b></div><div><div class="lbl">Work site</div>${esc(L0.name)}<br><span class="sm muted">${esc(L0.addr)}</span></div>
+   <div><div class="lbl">Reference</div>${esc(j.id)} · ${esc(c.name)}${c.pw?'<br><span class="sm muted">Prevailing wage contract</span>':''}${b.po?'<br>PO '+esc(b.po):''}</div></div>
+   <div class="lbl">Work performed</div><p style="margin:2px 0 10px"><b>${esc(j.title)}.</b> ${esc(j.resolution||j.desc)}</p>${notes.length?`<ul class="sm" style="margin:0 0 12px;padding-left:18px">${notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul>`:''}
+   <div class="wrap-x"><table class="tbl"><thead><tr><th>Description</th><th class="n">Qty</th><th class="n">Rate</th><th class="n">Amount</th></tr></thead><tbody>${L.map(l=>`<tr><td>${esc(l.desc)}${l.noInv?' <span class="pill p-crit">no vendor invoice</span>':''}</td><td class="n">${l.kind==='sub'||l.kind==='subadd'||l.kind==='partadd'||l.kind==='fixed'||l.kind==='trip'?'':hrsF(l.qty)+(l.kind==='labor'?' h':'')}</td><td class="n">${l.kind==='fixed'||l.kind==='sub'?'':money(l.rate)}</td><td class="n">${money(l.amt)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">Nothing to bill.</td></tr>'}
+   <tr><td colspan="3" class="n">Subtotal</td><td class="n">${money(T.sub)}</td></tr>${T.tax?`<tr><td colspan="3" class="n">Sales tax</td><td class="n">${money(T.tax)}</td></tr>`:''}<tr><td colspan="3" class="n"><b>Total due</b></td><td class="n"><b>${money(T.total)}</b></td></tr></tbody></table></div>
+   ${m==='pm'?`<p class="sm muted" style="margin-bottom:0">Preventive maintenance, ${c.pm.basis==='location'?'priced per location':'priced per piece of equipment'}, under ${esc(c.name)}.</p>`:m==='fixed'?`<p class="sm muted" style="margin-bottom:0">Contract price ${money(pr)} · previously billed ${money(bd)} · this invoice ${money(T.sub)} · remaining ${money(Math.max(0,pr-bd-T.sub))}</p>`:`<p class="sm muted" style="margin-bottom:0">${hrsF(lab)} labor hours billed${m==='costplus'?'. Materials and subcontractors at cost plus markup':''}. Hours detail by technician and day is available from the job's Time tab.</p>`}</div>
+  <div class="card stack" style="margin-top:14px"><div class="fgrid"><div class="field"><label for="bl-fmt">QuickBooks file</label><select id="bl-fmt" class="inp" data-chg="billFmt">${opt('qbo','QuickBooks Online invoice CSV',b.fmt)}</select></div></div>
+   <div class="bar" style="margin:0"><button class="btn pri" data-act="genInvoice"${L.length?'':' disabled'}>Generate import file</button>${b.out?`<button class="btn" data-act="copyInv">Copy to clipboard</button><button class="btn" data-act="markBilled">Mark ${esc(b.no)} as invoiced</button>`:''}</div>
+   ${b.out?`<textarea id="bl-out" class="out" readonly aria-label="Invoice export">${esc(b.out)}</textarea>`:''}<p class="sm muted">${m==='fixed'?'Marking as invoiced adds this amount to the billed-to-date total.':m==='pm'?'Marking as invoiced records this PM visit as billed.':'Marking as invoiced locks these hours and parts so they cannot be billed twice.'} Column layouts and income account names are samples to match to your QuickBooks setup.</p></div>`;
+}
+function invoiceExport(j,L){
+  const b=S.bill,T=invTotals(L),q=v=>/[",\n]/.test(v)?'"'+String(v).replace(/"/g,'""')+'"':String(v);
+  const mdy=d=>{const [y,m,dd]=d.split('-');return m+'/'+dd+'/'+y};
+  const memo=j.id+' '+j.title+(b.po?' PO '+b.po:''),name=cust(j.custId).name,site=loc(j.locId).name,isMat=l=>l.kind==='part'||l.kind==='partadd';
+  const sd=S.times.filter(x=>x.jobId===j.id).map(x=>x.date).sort().pop()||b.date;
+  if(b.fmt==='iif'){
+    const rows=['!TRNS\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tDOCNUM\tTERMS\tMEMO','!SPL\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tDOCNUM\tMEMO\tINVITEM\tPRICE\tQNTY','!ENDTRNS',
+      ['TRNS','INVOICE',mdy(b.date),'Accounts Receivable',name,T.total.toFixed(2),b.no,b.terms,memo].join('\t')];
+    L.forEach(l=>rows.push(['SPL','INVOICE',mdy(b.date),'Sales',name,(-l.amt).toFixed(2),b.no,l.desc,l.item,l.rate.toFixed(2),(-l.qty)].join('\t')));
+    if(T.tax)rows.push(['SPL','INVOICE',mdy(b.date),'Sales Tax Payable',name,(-T.tax).toFixed(2),b.no,'Sales tax','','',''].join('\t'));
+    rows.push('ENDTRNS');return rows.join('\n');
+  }
+  return ['InvoiceNo,Customer,InvoiceDate,DueDate,Terms,Location,Memo,Item(Product/Service),ItemDescription,ItemQuantity,ItemRate,ItemAmount,ItemTaxCode,Service Date'].concat(L.map(l=>[b.no,name,mdy(b.date),mdy(dueOf()),b.terms,site,memo,l.item,l.desc,l.qty.toFixed(2),l.rate.toFixed(2),l.amt.toFixed(2),isMat(l)&&T.tax?'TAX':'NON',mdy(sd)].map(q).join(','))).join('\n');
+}
+const EQ_TYPES=['Rooftop unit','Split system','Air handler','Boiler','Chiller','Pump','Water heater','Unit heater','Backflow preventer','CRAC unit','Exhaust fan','Other'];
+const eqOf=id=>S.equipment.find(q=>q.id===id)||{tag:'?'};
+const locEq=l=>S.equipment.filter(q=>q.locId===l);
+const eqTags=ids=>(ids||[]).map(i=>`<span class="pill">${esc(eqOf(i).tag)}</span>`).join(' ');
+const jdate=j=>j.start?fmtD(j.start)+(j.end&&j.end!==j.start?' to '+fmtD(j.end):'')+', '+pd(j.start).getFullYear():'No date';
+function visitsFor(j,eqId){return S.jobs.filter(x=>x.locId===j.locId&&x.id!==j.id&&(!eqId||(x.equip||[]).includes(eqId))).sort((a,b)=>(b.end||b.start||'').localeCompare(a.end||a.start||''))}
+function visitHTML(x){
+  const rd=x.checklist.filter(c=>c.type==='value'&&c.val).map(c=>esc(c.text)+' '+esc(c.val)),pr=x.parts.map(p=>(p.qty>1?p.qty+' × ':'')+esc(p.desc));
+  return `<div class="visit"><div class="bar" style="margin:0 0 2px"><span class="mono muted">${esc(x.id)}</span><b class="grow">${esc(x.title)}</b>${ppill(x.priority)}${spill(x.status)}</div>
+   <div class="sm muted">${jdate(x)}${x.assignees.length?' · '+x.assignees.map(i=>esc(emp(i).name)).join(', '):''}</div>${x.equip.length?`<div style="margin:4px 0">${eqTags(x.equip)}</div>`:''}
+   <p style="margin:4px 0">${esc(x.resolution||x.desc)}</p>${x.override?`<div class="sm" style="color:var(--warn)"><span class="lbl">Closed with checklist open</span> ${esc(x.override.reason)}</div>`:''}${rd.length?`<div class="sm"><span class="lbl">Readings</span> ${rd.join(' · ')}</div>`:''}${pr.length?`<div class="sm"><span class="lbl">Parts</span> ${pr.join(', ')}</div>`:''}
+   <div style="margin-top:6px"><button class="btn sm" data-act="openJob" data-id="${esc(x.id)}">Open ${esc(x.id)}</button></div></div>`;
+}
+function eqForm(px,locId,custId){
+  const site=locId?'':`<div class="field"><label for="${px}-loc">Site</label><select id="${px}-loc" class="inp">${S.locations.filter(l=>l.custId===custId).map(l=>opt(l.id,l.name,'')).join('')}</select></div>`;
+  return `<div class="fgrid" style="margin-top:10px">${site}<div class="field"><label for="${px}-tag">Tag</label><input id="${px}-tag" class="inp" placeholder="RTU-5"></div>
+   <div class="field"><label for="${px}-type">Type</label><select id="${px}-type" class="inp">${EQ_TYPES.map(t=>opt(t,t,'')).join('')}</select></div>
+   <div class="field"><label for="${px}-make">Make</label><input id="${px}-make" class="inp"></div><div class="field"><label for="${px}-model">Model</label><input id="${px}-model" class="inp"></div>
+   <div class="field"><label for="${px}-serial">Serial number</label><input id="${px}-serial" class="inp"></div><div class="field"><label for="${px}-area">Where in the building</label><input id="${px}-area" class="inp"></div></div>
+   <div class="bar" style="margin-bottom:0"><button class="btn" data-act="addEquip" data-px="${px}"${locId?` data-loc="${locId}"`:''}>Add equipment</button></div>`;
+}
+function histTab(j){
+  const eq=locEq(j.locId),on=j.equip||[];let v=visitsFor(j);
+  if(S.hf==='equip'&&on.length)v=v.filter(x=>x.equip.some(i=>on.includes(i)));
+  return `<div class="stack"><h3>Equipment at ${esc(loc(j.locId).name)} (${eq.length})</h3>
+   ${eq.map(q=>{const vs=visitsFor(j,q.id),is=on.includes(q.id);return `<details class="card"${is?' open':''}><summary><b>${esc(q.tag)}</b> · ${esc(q.type)} · ${esc(q.make)} ${esc(q.model)} ${is?'<span class="pill p-acc">On this call</span>':''}</summary>
+    <div class="kv sm" style="margin:8px 0"><span class="muted">Serial</span><span class="mono">${esc(q.serial)||'—'}</span><span class="muted">Where</span><span>${esc(q.area)||'—'}</span><span class="muted">Installed</span><span>${esc(q.inst)||'—'}</span>${q.notes?`<span class="muted">Notes</span><span>${esc(q.notes)}</span>`:''}</div>
+    <label class="sm"><input type="checkbox" data-chg="jobEquip" data-id="${q.id}"${is?' checked':''}> Working on this unit on this call</label>
+    <div class="lbl" style="margin-top:8px">Service history (${vs.length})</div>${vs.map(x=>`<div class="sm" style="padding:5px 0;border-top:1px solid var(--line)"><span class="mono">${esc(x.id)}</span> ${jdate(x)} · ${esc(x.title)}<br><span class="muted">${esc(x.resolution||x.desc)}</span></div>`).join('')||'<div class="sm muted">No recorded visits.</div>'}</details>`}).join('')||'<div class="empty">No equipment recorded for this site yet.</div>'}
+   <details class="card"><summary><b>Add equipment found on site</b></summary>${eqForm('ae',j.locId)}</details>
+   <div class="bar" style="margin:6px 0 0"><h3 class="grow">Site visits (${v.length})</h3><button class="btn sm${S.hf==='all'?' pri':''}" data-act="hf" data-v="all">All visits</button>${on.length?`<button class="btn sm${S.hf==='equip'?' pri':''}" data-act="hf" data-v="equip">Only this call's equipment</button>`:''}</div>
+   ${v.map(visitHTML).join('')||'<div class="empty">No earlier visits recorded at this site.</div>'}</div>`;
+}
+function eqCustomerCard(c){
+  const L=S.locations.filter(l=>l.custId===c.id),rows=S.equipment.filter(q=>L.some(l=>l.id===q.locId));
+  return `<div class="card"><h2>${esc(c.name)}: equipment</h2><p class="sm muted">Technicians see this list, with each unit's service history, on every ticket at the site.</p>
+   <div class="wrap-x"><table class="tbl"><thead><tr><th>Site</th><th>Tag</th><th>Type</th><th>Make and model</th><th>Serial</th><th>Installed</th><th class="n">Visits</th></tr></thead><tbody>
+   ${rows.map(q=>`<tr><td>${esc(loc(q.locId).name)}</td><td><b>${esc(q.tag)}</b></td><td>${esc(q.type)}</td><td>${esc(q.make)} ${esc(q.model)}</td><td class="mono">${esc(q.serial)}</td><td>${esc(q.inst)}</td><td class="n">${S.jobs.filter(x=>(x.equip||[]).includes(q.id)).length}</td></tr>`).join('')||'<tr><td colspan="7" class="muted">No equipment yet.</td></tr>'}</tbody></table></div>
+   <details style="margin-top:10px"><summary><b>Add equipment</b></summary>${eqForm('ce',null,c.id)}</details></div>`;
+}
+function pmHeads(j,L){
+  const c=con(j.contractId),out=[];
+  if(c.pm.basis==='equipment'&&!(j.equip||[]).length)out.push('<span class="pill p-crit">No equipment selected</span>');
+  if(L.some(l=>l.noPrice))out.push('<span class="pill p-crit">PM price missing</span>');
+  if(!out.length)out.push(`<span class="sm muted">${c.pm.basis==='location'?'Per location':(j.equip||[]).length+' units serviced'}</span>`);
+  return out.join(' ');
+}
+function pmEditor(k){
+  const L=S.locations.filter(l=>l.custId===k.custId),eqs=S.equipment.filter(q=>L.some(l=>l.id===q.locId)),types=EQ_TYPES.filter(t=>eqs.some(q=>q.type===t)),pm=k.pm;
+  let body='';
+  if(pm.basis==='location')body=`<div class="fgrid">${L.map(l=>`<div class="field"><label>${esc(l.name)} $ per PM</label><input type="number" step="0.01" class="inp" value="${pm.locPrices[l.id]==null?'':pm.locPrices[l.id]}" placeholder="${pm.locDefault||''}" data-chg="pmLoc" data-id="${k.id}" data-loc="${l.id}"></div>`).join('')}
+    <div class="field"><label>Default for other sites $</label><input type="number" step="0.01" class="inp" value="${pm.locDefault||''}" data-chg="pmDefault" data-id="${k.id}"></div></div>`;
+  else if(pm.basis==='equipment'){
+    const round=types.reduce((s,t)=>s+(pm.eqPrices[t]||0)*eqs.filter(q=>q.type===t).length,0);
+    body=types.length?`<div class="fgrid">${types.map(t=>`<div class="field"><label>${esc(t)} $ per unit (${eqs.filter(q=>q.type===t).length} on file)</label><input type="number" step="0.01" class="inp" value="${pm.eqPrices[t]==null?'':pm.eqPrices[t]}" data-chg="pmEq" data-id="${k.id}" data-type="${esc(t)}"></div>`).join('')}</div><div class="sm muted" style="margin-top:6px">A PM visit on every unit on file would bill ${money(round)}.</div>`:'<div class="sm muted">Add this customer\'s equipment above to set per-unit prices.</div>';
+  }
+  return `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><div class="bar" style="margin:0 0 8px"><b>Preventive maintenance pricing</b>
+   <select class="inp" data-chg="pmBasis" data-id="${k.id}">${opt('none','Bill PM like any other ticket',pm.basis)}${opt('location','One price per location',pm.basis)}${opt('equipment','One price per piece of equipment',pm.basis)}</select></div>${body}</div>`;
+}
+function overviewTab(j){
+  const o=isOffice(),L=loc(j.locId),b=null;
+  const dis=o?'':' disabled';
+  const sel=(f,list,cur)=>`<select class="inp" data-chg="jobField" data-f="${f}"${dis}>${list.join('')}</select>`;
+  const stats=j.kind==='project'?['Planning','In progress','On hold','Complete']:['Unassigned','Scheduled','In progress','On hold','Complete'];
+  return `<div class="stack">${clLeft(j)?`<div class="banner" style="background:var(--warn-soft);color:var(--warn);margin:0">${clLeft(j)} checklist item${clLeft(j)>1?'s':''} still open. Finish the checklist to close this call. <button class="btn sm" data-act="dtab" data-t="checklist">Open checklist</button>${isOffice()&&j.status!=='Complete'?` <button class="btn sm" data-act="openOverride" data-id="${j.id}">Close anyway</button>`:''}</div>`:''}${j.override?`<div class="card"><div class="lbl">Closed with open checklist items</div><div>${esc(j.override.reason)}</div><div class="sm muted">${esc(j.override.by)} · ${esc(j.override.at)} · ${j.override.open} item${j.override.open>1?'s':''} open at closing</div></div>`:''}<div class="fgrid">
+   <div class="field"><label>Customer</label>${sel('custId',S.customers.map(c=>opt(c.id,c.name,j.custId)))}</div>
+   <div class="field"><label>Location</label>${sel('locId',S.locations.filter(l=>l.custId===j.custId).map(l=>opt(l.id,l.name,j.locId)))}</div>
+   ${o?`<div class="field"><label>Contract (sets pricing)</label>${sel('contractId',S.contracts.filter(k=>k.custId===j.custId).map(k=>opt(k.id,k.name,j.contractId)))}</div>`:''}
+   <div class="field"><label>Priority</label>${sel('priority',['Emergency','High','Normal','PM'].map(p=>opt(p,p,j.priority)))}</div>
+   <div class="field"><label>Status</label><select class="inp" data-chg="jobField" data-f="status">${stats.map(s=>s==='Complete'&&clLeft(j)&&j.status!=='Complete'?'<option value="Complete" disabled>Complete (checklist still open)</option>':opt(s,s,j.status)).join('')}</select></div>
+   <div class="field"><label>Start</label><input type="date" class="inp" value="${j.start||''}" data-chg="jobField" data-f="start"${dis}></div>
+   <div class="field"><label>End</label><input type="date" class="inp" value="${j.end||''}" data-chg="jobField" data-f="end"${dis}></div></div>
+   ${j.kind==='ticket'?`<div class="card"><div class="lbl">Crew</div><div class="bar" style="margin:6px 0 0">${j.assignees.length?j.assignees.map(i=>`<span class="pill">${esc(emp(i).name)}${i===j.lead?' (lead)':''}</span>`).join(''):'<span class="muted">No one assigned</span>'}<span class="grow"></span>${o?`<button class="btn" data-act="openAssign" data-key="${j.id}">Assign people and dates</button>`:''}</div></div>`:''}
+   <div class="card"><div class="lbl">Site</div><div><b>${esc(L.name)}</b> · ${esc(L.addr)}</div><div class="sm muted">${esc(L.notes)||'No access notes.'}</div></div>
+   ${locEq(j.locId).length?`<div class="card"><div class="bar" style="margin:0 0 4px"><div class="lbl grow">Equipment on this call</div><button class="btn sm" data-act="dtab" data-t="history">Site history</button></div>${locEq(j.locId).map(q=>`<label class="cl-row"><input type="checkbox" data-chg="jobEquip" data-id="${q.id}"${(j.equip||[]).includes(q.id)?' checked':''}><span class="t"><b>${esc(q.tag)}</b> ${esc(q.type)} <span class="muted sm">${esc(q.area)}</span></span></label>`).join('')}</div>`:''}
+   <div class="field"><label>Description</label><textarea class="inp" data-chg="jobField" data-f="desc">${esc(j.desc)}</textarea></div>
+   <div class="field"><label>Findings and work performed</label><textarea class="inp" data-chg="jobField" data-f="resolution" placeholder="What was wrong, what you did, what to watch next time">${esc(j.resolution||'')}</textarea></div>
+   ${o?estimateCard(j):''}</div>`;
+}
+function tasksTab(j){
+  return `<div class="stack">${j.tasks.map(t=>{const a=jobHrs(j.id,t.id);return `<div class="card"><div class="bar" style="margin:0 0 6px"><b class="grow">${esc(t.name)}</b><select class="inp" data-chg="taskStatus" data-t="${t.id}">${['Not started','In progress','Done'].map(s=>opt(s,s,t.status)).join('')}</select></div>
+   <div class="sm">${avs(t.assignees)} ${t.start?fmtD(t.start)+' to '+fmtD(t.end):'Not scheduled'} ${isOffice()?`<button class="btn sm" data-act="openAssign" data-key="${j.id}:${t.id}">Assign and schedule</button>`:''}</div>
+   <div class="meter${a>t.budget?' over':''}" style="margin:8px 0 2px"><i style="width:${Math.min(100,a/t.budget*100)}%"></i></div><div class="sm muted">${hrsF(a)} of ${t.budget} budgeted hours${a>t.budget?' (over budget)':''}</div></div>`}).join('')}
+   ${isOffice()?`<div class="card"><div class="fgrid"><div class="field"><label for="tk-name">New task</label><input id="tk-name" class="inp"></div><div class="field"><label for="tk-bud">Budget hours</label><input id="tk-bud" type="number" class="inp"></div></div><div class="bar" style="margin-bottom:0"><button class="btn" data-act="addTask">Add task</button></div></div>`:''}</div>`;
+}
+function checklistTab(j){
+  const cl=j.checklist,items=cl.filter(c=>c.type!=='head'),dn=items.filter(c=>c.type==='value'?c.val:c.done).length;
+  return `<div class="stack"><div class="card"><div class="bar" style="margin:0"><b>${dn} of ${items.length} complete</b><span class="grow"></span><div class="meter" style="width:140px"><i style="width:${items.length?dn/items.length*100:0}%"></i></div></div>
+   ${cl.map(c=>c.type==='head'?`<div class="cl-head">${esc(c.text)}</div>`:c.type==='value'?`<div class="cl-row${c.val?' ok':''}"><span class="t">${esc(c.text)}</span><input class="inp s" value="${esc(c.val)}" placeholder="Reading" data-chg="clVal" data-id="${c.id}" aria-label="${esc(c.text)}"></div>`:
+     `<label class="cl-row${c.done?' ok':''}"><input type="checkbox" data-chg="clCheck" data-id="${c.id}"${c.done?' checked':''}><span class="t">${esc(c.text)}</span>${c.done&&c.by?`<span class="sm muted">${esc(c.by)} · ${esc(c.at)}</span>`:''}</label>`).join('')||'<div class="empty">No checklist yet. Apply a template, import one, or add items below.</div>'}</div>
+   <div class="card"><div class="bar" style="margin-top:0"><select id="cl-tpl" class="inp">${S.templates.map(t=>opt(t.id,t.name,'')).join('')}</select><button class="btn" data-act="applyTpl">Apply template</button><button class="btn" data-act="openImport" data-target="job">Import from file or paste</button></div>
+   <div class="bar" style="margin-bottom:0"><input id="cl-new" class="inp grow" placeholder="Add a checklist item" data-enter="addClItem"><button class="btn" data-act="addClItem">Add</button></div></div></div>`;
+}
+function timeTab(j){
+  const list=S.times.filter(t=>t.jobId===j.id).sort((a,b)=>b.date.localeCompare(a.date));
+  let byTask='';
+  if(j.kind==='project')byTask=`<div class="card"><div class="lbl">Hours by task</div>${j.tasks.map(t=>`<div class="bar" style="margin:6px 0"><span style="width:180px">${esc(t.name)}</span><div class="meter grow"><i style="width:${Math.min(100,jobHrs(j.id,t.id)/t.budget*100)}%"></i></div><span class="sm">${hrsF(jobHrs(j.id,t.id))}/${t.budget}</span></div>`).join('')}</div>`;
+  return `<div class="stack">${timeForm('dt',j.id)}${byTask}<div class="card"><b>${hrsF(jobHrs(j.id))} total hours</b>${timeRows(list,false)}</div></div>`;
+}
+function partsTab(j){
+  const tot=j.parts.reduce((s,p)=>s+p.qty*p.cost,0),re=j.parts.filter(p=>p.reimb).reduce((s,p)=>s+p.qty*p.cost,0);
+  return `<div class="stack"><div class="card wrap-x"><table class="tbl"><thead><tr><th>Part</th><th class="n">Qty</th><th class="n">Cost</th><th>Source</th><th>Invoice</th><th></th></tr></thead><tbody>
+   ${j.parts.map(p=>`<tr><td>${esc(p.desc)}</td><td class="n">${p.qty}</td><td class="n">${money(p.qty*p.cost)}</td><td>${esc(p.src)}${p.vendor?'<div class="sm muted">'+esc(p.vendor)+'</div>':''}${p.by?`<div class="sm muted">${esc(emp(p.by).name)}${p.reimb?' · reimburse':''}</div>`:''}</td>
+   <td>${p.invoice?(p.invoice.kind==='image'?`<img src="${p.invoice.src}" alt="Invoice" style="width:56px;border-radius:3px;cursor:zoom-in" data-act="zoom" data-src="${p.id}">`:`<span class="pill p-good">${esc(p.invoice.name)}</span>`):!needsInv(p)?'<span class="muted">n/a</span>':'<span class="pill p-crit">Missing</span>'}
+   ${needsInv(p)?`<label class="btn sm" style="margin-left:4px">${p.invoice?'Replace':'Attach'}<input type="file" hidden accept="image/*,application/pdf" data-chg="partInv" data-id="${p.id}"></label>`:''}</td>
+   <td><button class="btn sm ghost" data-act="delPart" data-id="${p.id}">Remove</button></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No parts recorded.</td></tr>'}</tbody></table>
+   <div class="sm muted" style="margin-top:8px">Parts cost ${money(tot)}${re?` · to reimburse technicians ${money(re)}`:''}</div></div>
+   <div class="card"><div class="lbl" style="margin-bottom:6px">Add a part or purchase</div><div class="fgrid">
+   <div class="field"><label for="pp-desc">Description</label><input id="pp-desc" class="inp"></div><div class="field"><label for="pp-qty">Qty</label><input id="pp-qty" type="number" class="inp" value="1"></div><div class="field"><label for="pp-cost">Unit cost $</label><input id="pp-cost" type="number" step="0.01" class="inp"></div>
+   <div class="field"><label for="pp-src">Source</label><select id="pp-src" class="inp"><option>Stock</option><option>Purchased by tech</option><option>Supplier PO</option><option>Subcontractor</option></select></div>
+   <div class="field"><label for="pp-vendor">Vendor or subcontractor</label><input id="pp-vendor" class="inp"></div>
+   <div class="field"><label for="pp-reimb">Reimburse tech?</label><select id="pp-reimb" class="inp"><option value="0">No</option><option value="1">Yes</option></select></div>
+   <div class="field" style="grid-column:1/-1"><label for="pp-file">Invoice or receipt (photo or PDF)</label><input id="pp-file" type="file" accept="image/*,application/pdf" class="inp"></div></div>
+   <div class="bar" style="margin-bottom:0"><button class="btn pri" data-act="addPart">Add part</button></div></div></div>`;
+}
+function photosTab(j){
+  return `<div class="stack"><div class="card"><label class="btn pri">Add photos<input type="file" hidden accept="image/*" multiple data-chg="photoUp"></label> <span class="sm muted">On a phone this opens the camera or photo library.</span></div>
+   ${j.photos.length?`<div class="photos">${j.photos.map(p=>`<div class="ph"><img src="${p.src}" alt="${esc(p.cap||'Job photo')}" data-act="zoom" data-src="${p.id}"><div>
+    <select class="inp" data-chg="phPhase" data-id="${p.id}">${['Before','During','After','Issue'].map(x=>opt(x,x,p.phase)).join('')}</select>
+    <input class="inp" placeholder="Caption" value="${esc(p.cap)}" data-chg="phCap" data-id="${p.id}"><span class="sm muted">${esc(p.by)} · ${esc(p.at)}</span><button class="btn sm ghost" data-act="delPhoto" data-id="${p.id}">Remove</button></div></div>`).join('')}</div>`:'<div class="empty">No photos yet. Add before and after shots, nameplates and problem areas.</div>'}</div>`;
+}
+function drawerHTML(){
+  if(!S.drawer)return '';
+  const j=job(S.drawer.id),t=S.drawer.tab;
+  const tabs=[['overview','Overview'],['history','Site history ('+visitsFor(j).length+')']];if(j.kind==='project')tabs.push(['tasks','Tasks ('+j.tasks.length+')']);
+  tabs.push(['checklist','Checklist'],['time','Time ('+hrsF(jobHrs(j.id))+' h)'],['parts','Parts ('+j.parts.length+')'],['photos','Photos ('+j.photos.length+')']);
+  const body={overview:overviewTab,tasks:tasksTab,checklist:checklistTab,time:timeTab,parts:partsTab,photos:photosTab,history:histTab}[t](j);
+  return `<button class="backdrop" data-act="closeDrawer" aria-label="Close"></button><aside class="drawer${S.drawerAnim?' enter':''}" role="dialog" aria-label="${esc(j.title)}"><div class="dh"><div class="bar" style="margin:0 0 4px"><span class="mono muted">${j.id}</span>${ppill(j.priority)}${spill(j.status)}<span class="grow"></span><button class="btn" data-act="closeDrawer">Close</button></div>
+   <h2>${esc(j.title)}</h2><div class="sm muted">${esc(cust(j.custId).name)} · ${esc(loc(j.locId).name)}</div>
+   <div class="dtabs">${tabs.map(x=>`<button class="tab" data-act="dtab" data-t="${x[0]}" aria-current="${x[0]===t}">${x[1]}</button>`).join('')}</div></div><div class="db">${body}</div></aside>`;
+}
+function modalHTML(){
+  const m=S.modal;if(!m)return '';
+  let h='';
+  if(m.type==='assign'){
+    const [jid,tid]=m.key.split(':'),j=job(jid),o=tid?j.tasks.find(t=>t.id===tid):j;
+    const title=tid?o.name:j.title;
+    const st=o.start||S.today,en=o.end||o.start||S.today;
+    const busy=e=>schedItems().filter(i=>i.key!==m.key&&i.assignees.includes(e)&&i.start<=en&&i.end>=st&&!i.done).length;
+    h=`<h2>Assign and schedule</h2><p class="muted">${esc(j.id)} · ${esc(title)}</p><div class="fgrid"><div class="field"><label for="as-start">Start</label><input id="as-start" type="date" class="inp" value="${st}"></div><div class="field"><label for="as-end">End (multi-day ok)</label><input id="as-end" type="date" class="inp" value="${en}"></div></div>
+     <div class="lbl" style="margin:12px 0 4px">People</div><div class="stack" style="gap:4px">${S.employees.map(e=>{const n=busy(e.id);return `<label class="cl-row"><input type="checkbox" class="as-emp" value="${e.id}"${o.assignees.includes(e.id)?' checked':''}><span class="t">${esc(e.name)} <span class="muted sm">${esc(e.role)}</span></span>${n?`<span class="pill p-warn">${n} other job${n>1?'s':''} overlap</span>`:''}</label>`}).join('')}</div>
+     ${tid?'':`<div class="field" style="margin-top:10px"><label for="as-lead">Lead</label><select id="as-lead" class="inp">${S.employees.map(e=>opt(e.id,e.name,o.lead)).join('')}</select></div>`}
+     <div class="bar"><button class="btn pri" data-act="saveAssign">Save</button><button class="btn" data-act="closeModal">Cancel</button></div>`;
+  }else if(m.type==='newJob'){
+    const cid=m.custId||S.customers[0].id;
+    h=`<h2>New ${m.kind}</h2><div class="stack"><div class="fgrid"><div class="field"><label for="nj-kind">Type</label><select id="nj-kind" class="inp" data-chg="njKind">${opt('ticket','Service ticket',m.kind)}${opt('project','Project',m.kind)}</select></div>
+     <div class="field"><label for="nj-pri">Priority</label><select id="nj-pri" class="inp">${['Normal','High','Emergency','PM'].map(p=>opt(p,p,m.pri||'Normal')).join('')}</select></div></div>
+     <div class="field"><label for="nj-title">Title</label><input id="nj-title" class="inp" value="${esc(m.title||'')}"></div>
+     <div class="fgrid"><div class="field"><label for="nj-cust">Customer</label><select id="nj-cust" class="inp" data-chg="njCust">${S.customers.map(c=>opt(c.id,c.name,cid)).join('')}</select></div>
+     <div class="field"><label for="nj-loc">Location</label><select id="nj-loc" class="inp">${S.locations.filter(l=>l.custId===cid).map(l=>opt(l.id,l.name,'')).join('')}</select></div>
+     <div class="field"><label for="nj-con">Contract</label><select id="nj-con" class="inp">${S.contracts.filter(k=>k.custId===cid).map(k=>opt(k.id,k.name,'')).join('')}</select></div>
+     ${m.kind==='ticket'?`<div class="field"><label for="nj-tpl">Checklist</label><select id="nj-tpl" class="inp"><option value="">None</option>${S.templates.map(t=>opt(t.id,t.name,'')).join('')}</select></div>`:''}</div>
+     <div class="field"><label for="nj-desc">Description</label><textarea id="nj-desc" class="inp">${esc(m.desc||'')}</textarea></div></div>
+     <div class="bar"><button class="btn pri" data-act="saveNewJob">Create</button><button class="btn" data-act="closeModal">Cancel</button></div>`;
+  }else if(m.type==='import'){
+    h=`<h2>Import a checklist</h2><p class="muted sm">One item per line. Start a line with # for a section heading, end it with |value when the tech should enter a reading. A CSV with a header row (item, section, type) also works.</p>
+     <div class="field"><label for="imp-file">Open a .csv or .txt file</label><input id="imp-file" type="file" accept=".csv,.txt,text/plain,text/csv" class="inp" data-chg="impFile"></div>
+     <div class="field" style="margin-top:8px"><label for="imp-text">Or paste the list</label><textarea id="imp-text" class="inp" style="min-height:130px">${esc(m.text||'')}</textarea></div>
+     <div class="field" style="margin-top:8px"><label for="imp-name">Save to library as${m.target==='job'?' (optional)':''}</label><input id="imp-name" class="inp" value="${esc(m.name||'')}"></div>
+     <div class="bar"><button class="btn" data-act="impPreview">Preview</button></div>
+     ${m.parsed?`<div class="card" style="max-height:200px;overflow:auto">${m.parsed.length?m.parsed.map(i=>i.type==='head'?`<div class="cl-head" style="margin:6px 0 2px">${esc(i.text)}</div>`:`<div class="cl-row"><span class="t">${esc(i.text)}</span>${i.type==='value'?'<span class="pill p-info">reading</span>':''}</div>`).join(''):'<span class="muted">No items found.</span>'}</div>`:''}
+     <div class="bar"><button class="btn pri" data-act="impSave"${m.parsed&&m.parsed.length?'':' disabled'}>${m.target==='job'?'Add to this job':'Save template'}</button><button class="btn" data-act="closeModal">Cancel</button></div>`;
+  }else if(m.type==='override'){
+    const j=job(m.id),open=j.checklist.filter(c=>c.type!=='head'&&(c.type==='value'?!c.val:!c.done));
+    h=`<h2>Close with open checklist items</h2><p class="muted">${esc(j.id)} · ${esc(j.title)}</p><p>${open.length} item${open.length>1?'s are':' is'} still open:</p><ul class="sm" style="margin:0 0 10px;padding-left:18px">${open.slice(0,6).map(c=>`<li>${esc(c.text)}</li>`).join('')}${open.length>6?`<li>and ${open.length-6} more</li>`:''}</ul>
+     <div class="field"><label for="ov-reason">Reason for closing without finishing (required)</label><textarea id="ov-reason" class="inp" placeholder="Example: customer cancelled the rest of the work"></textarea></div>
+     <p class="sm muted">The reason, your name and the time are saved on the call and show in its site history.</p>
+     <div class="bar"><button class="btn pri" data-act="confirmOverride">Close call</button><button class="btn" data-act="closeModal">Cancel</button></div>`;
+  }else if(m.type==='zoom'){
+    return `<button class="backdrop m" data-act="closeModal" aria-label="Close"></button><div class="modal wide" style="text-align:center"><img src="${m.src}" alt="Enlarged" style="max-width:100%;max-height:74vh"><div class="bar" style="justify-content:center"><button class="btn" data-act="closeModal">Close</button></div></div>`;
+  }
+  return `<button class="backdrop m" data-act="closeModal" aria-label="Close"></button><div class="modal${m.type==='import'?' wide':''}" role="dialog">${h}</div>`;
+}
+const views={dispatch:dispatchView,jobs:jobsView,projects:projectsView,time:timeView,timesheets:timesheetsView,customers:customersView,checklists:checklistsView,parts:partsView,billing:billingView,mywork:myWorkView};
+function render(){
+  const nav=isOffice()?OFFICE_NAV:TECH_NAV;
+  if(!nav.some(n=>n[0]===S.view))S.view=nav[0][0];
+  const sy=window.scrollY,ds0=$('.db'),dy=ds0?ds0.scrollTop:0;
+  $('#app').innerHTML=headerHTML()+'<main>'+views[S.view]()+'</main>';
+  $('#layer').innerHTML=drawerHTML()+modalHTML();S.drawerAnim=false;
+  const d=$('.db');if(d)d.scrollTop=dy;window.scrollTo(0,sy);
+}
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>{t.hidden=true},2800)}
+const actor=()=>isOffice()?'Office':emp(S.user).name;
+const nowStr=()=>fmtD(S.today)+' '+new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+const val=id=>{const e=document.getElementById(id);return e?e.value:''};
+const curJob=()=>S.drawer?job(S.drawer.id):null;
+function readAtt(f){return new Promise(res=>{const r=new FileReader();r.onload=()=>{
+  if(!f.type.startsWith('image/'))return res({name:f.name,src:r.result,kind:'pdf'});
+  const im=new Image();im.onload=()=>{const k=Math.min(1,1400/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);res({name:f.name,src:c.toDataURL('image/jpeg',.8),kind:'image'})};
+  im.onerror=()=>res({name:f.name,src:r.result,kind:'image'});im.src=r.result};r.readAsDataURL(f)})}
+const targetOf=key=>{const [jid,tid]=key.split(':'),j=job(jid);return {j,o:tid?j.tasks.find(t=>t.id===tid):j,tid}};
+function capNJ(){const m=S.modal;m.title=val('nj-title');m.desc=val('nj-desc');m.pri=val('nj-pri')}
+const acts={
+  nav:el=>{S.view=el.dataset.v;S.drawer=null;render()},
+  wk:el=>{const n=+el.dataset.n;S.weekStart=n?addDays(S.weekStart,n):mondayOf(S.today);render()},
+  openJob:el=>{S.drawerAnim=true;const j=job(el.dataset.id);S.drawer={id:j.id,tab:el.dataset.tab||'overview'};render()},
+  closeDrawer:()=>{S.drawer=null;render()},
+  dtab:el=>{S.drawer.tab=el.dataset.t;render();const d=$('.db');if(d)d.scrollTop=0},
+  openAssign:el=>{S.modal={type:'assign',key:el.dataset.key};render()},
+  openOverride:el=>{if(!isOffice())return;S.modal={type:'override',id:el.dataset.id};render()},
+  confirmOverride:()=>{const j=job(S.modal.id),reason=val('ov-reason').trim();if(!reason)return toast('Enter a reason before closing.');
+    const open=j.checklist.filter(c=>c.type!=='head'&&(c.type==='value'?!c.val:!c.done));
+    j.status='Complete';j.override={reason,by:actor(),at:nowStr(),open:open.length};S.modal=null;toast(j.id+' closed with '+open.length+' checklist item'+(open.length>1?'s':'')+' open');render()},
+  closeModal:()=>{S.modal=null;render()},
+  saveAssign:()=>{
+    const {j,o,tid}=targetOf(S.modal.key),st=val('as-start'),en=val('as-end')||st;
+    const ids=[...document.querySelectorAll('.as-emp:checked')].map(e=>e.value);
+    if(!st||en<st)return toast('Pick a start date, and an end date on or after it.');
+    if(!ids.length)return toast('Pick at least one person.');
+    o.assignees=ids;o.start=st;o.end=en;if(!tid){o.lead=ids.includes(val('as-lead'))?val('as-lead'):ids[0];if(o.status==='Unassigned')o.status='Scheduled'}
+    S.modal=null;toast('Scheduled '+ids.length+' '+(ids.length>1?'people':'person')+', '+fmtD(st)+(en!==st?' to '+fmtD(en):''));render()},
+  newJob:el=>{S.modal={type:'newJob',kind:el.dataset.kind||'ticket',custId:S.customers[0].id};render()},
+  saveNewJob:()=>{
+    const m=S.modal,title=val('nj-title').trim();if(!title)return toast('Give it a title.');
+    const kind=m.kind,n=S.jobs.filter(j=>j.kind===kind).map(j=>+j.id.slice(2));
+    const id=(kind==='ticket'?'T-':'P-')+(Math.max(...n,kind==='ticket'?1040:209)+1);
+    const j={id,kind,title,custId:val('nj-cust'),locId:val('nj-loc'),contractId:val('nj-con'),priority:val('nj-pri'),status:kind==='ticket'?'Unassigned':'Planning',start:null,end:null,assignees:[],lead:'',desc:val('nj-desc'),trip:kind==='ticket',checklist:[],parts:[],photos:[]};
+    if(kind==='project')j.tasks=[];
+    const tp=S.templates.find(t=>t.id===val('nj-tpl'));if(tp)j.checklist=mkCl(tp.items);
+    S.jobs.push(j);S.modal=null;S.drawer={id,tab:'overview'};toast(id+' created');render()},
+  addTime:async el=>{
+    const px=el.dataset.px,jid=el.dataset.job||val(px+'-job'),j=jb(jid),hrs=parseFloat(val(px+'-hrs'));
+    if(!(hrs>0&&hrs<=24))return toast('Enter hours between 0.25 and 24.');
+    const tid=j.kind==='project'?val(px+'-task'):null;
+    S.times.push({id:uid('t'),emp:val(px+'-emp'),date:val(px+'-date')||S.today,jobId:jid,taskId:tid,hrs,type:val(px+'-type'),note:val(px+'-note').trim(),status:'open'});
+    S.time.date=val(px+'-date')||S.today;if(isOffice())S.time.emp=val(px+'-emp');
+    toast(hrsF(hrs)+' h added');render()},
+  prepInvoice:el=>{const b=S.bill;b.jobId=el.dataset.id;b.no='INV-'+(3501+S.invoices.length);b.date=S.today;b.po='';b.out='';b.fixedNow=fixedRemaining(job(el.dataset.id));S.view='billing';S.drawer=null;render();window.scrollTo(0,0)},
+  billBack:()=>{S.bill.jobId=null;S.bill.out='';render()},
+  genInvoice:()=>{const j=job(S.bill.jobId);S.bill.out=invoiceExport(j,invLines(j));render();const o=$('#bl-out');if(o)o.scrollIntoView({block:'nearest'})},
+  copyInv:async()=>{const ta=$('#bl-out');try{await navigator.clipboard.writeText(S.bill.out);toast('Copied to clipboard')}catch(e){ta.focus();ta.select();toast('Selected. Press Ctrl or Cmd + C to copy.')}},
+  markBilled:()=>{const b=S.bill,j=job(b.jobId),L=invLines(j),T=invTotals(L);
+    L.forEach(l=>{if(l.kind==='fixed'){j.billedFixed=(j.billedFixed||0)+l.amt;return}if(l.kind==='pm'){j.pmBilled=true;return}if(l.ids)S.times.forEach(x=>{if(l.ids.includes(x.id))x.invId=b.no});if(l.pid)j.parts.find(p=>p.id===l.pid).invId=b.no;if(l.pids)l.pids.forEach(id=>{j.parts.find(p=>p.id===id).invId=b.no});if(l.kind==='trip')j.tripBilled=true});
+    S.invoices.push({no:b.no,jobId:j.id,date:b.date,total:T.total,cust:cust(j.custId).name});toast(b.no+' marked as invoiced');b.jobId=null;b.out='';render()},
+  hf:el=>{S.hf=el.dataset.v;render()},
+  addEquip:el=>{const px=el.dataset.px,l=el.dataset.loc||val(px+'-loc'),tag=val(px+'-tag').trim();if(!tag)return toast('Enter an equipment tag, like RTU-5.');
+    const q={id:uid('q'),locId:l,tag,type:val(px+'-type'),make:val(px+'-make'),model:val(px+'-model'),serial:val(px+'-serial'),area:val(px+'-area'),inst:'',notes:''};S.equipment.push(q);
+    const j=curJob();if(px==='ae'&&j)j.equip.push(q.id);toast(tag+' added'+(px==='ae'?' and marked on this call':''));render()},
+  delTime:el=>{S.times=S.times.filter(t=>t.id!==el.dataset.id);render()},
+  tweek:el=>{S.time.date=addDays(S.time.date,+el.dataset.n);render()},
+  pickDay:el=>{S.time.date=el.dataset.d;render()},
+  submitWeek:()=>{const wk=mondayOf(S.time.date),en=addDays(wk,6);let n=0;S.times.forEach(t=>{if(t.emp===meId()&&t.date>=wk&&t.date<=en&&t.status==='open'){t.status='submitted';n++}});toast(n+' entries submitted to the office');render()},
+  approveRange:()=>{let n=0;S.times.forEach(t=>{if(t.date>=S.ts.from&&t.date<=S.ts.to&&t.status==='submitted'){t.status='approved';n++}});toast(n+' entries approved');render()},
+  genExport:()=>{const l=tsEntries();if(!l.length)return toast('No entries match. Approve submitted time or widen the range.');S.ts.out=exportText(l);S.ts.ids=l.map(t=>t.id);render();const o=$('#ts-out');if(o)o.scrollIntoView({block:'nearest'})},
+  copyOut:async()=>{const ta=$('#ts-out');try{await navigator.clipboard.writeText(S.ts.out);toast('Copied to clipboard')}catch(e){ta.focus();ta.select();toast('Selected. Press Ctrl or Cmd + C to copy.')}},
+  markExported:()=>{S.times.forEach(t=>{if(S.ts.ids.includes(t.id))t.status='exported'});toast(S.ts.ids.length+' entries marked as exported');S.ts.out='';S.ts.ids=[];render()},
+  selCust:el=>{S.custSel=el.dataset.id;render()},
+  addCust:()=>{const n=val('nc-name').trim();if(!n)return toast('Enter a customer name.');const id=uid('c');S.customers.push({id,name:n});S.custSel=id;render()},
+  addLoc:()=>{const n=val('nl-name').trim();if(!n)return toast('Enter a site name.');S.locations.push({id:uid('l'),custId:S.custSel,name:n,addr:val('nl-addr'),notes:val('nl-notes')});render()},
+  addContract:()=>{const n=val('nk-name').trim();if(!n)return toast('Enter a contract name.');const g=i=>parseFloat(val(i))||0;
+    S.contracts.push({id:uid('k'),custId:S.custSel,name:n,type:val('nk-type'),pw:val('nk-pw')==='1',rates:R(g('nk-F'),g('nk-J'),g('nk-A'),g('nk-H')),ot:g('nk-ot')||1.5,markup:g('nk-mk'),trip:g('nk-trip'),method:val('nk-method'),adS:g('nk-ads'),pm:{basis:'none',locPrices:{},locDefault:0,eqPrices:{}},start:S.today,end:addDays(S.today,364)});toast('Contract added');render()},
+  selTpl:el=>{S.tplSel=el.dataset.id;render()},
+  delTpl:()=>{if(S.templates.length<2)return toast('Keep at least one template.');S.templates=S.templates.filter(t=>t.id!==S.tplSel);S.tplSel=S.templates[0].id;render()},
+  delTplItem:el=>{S.templates.find(t=>t.id===S.tplSel).items.splice(+el.dataset.n,1);render()},
+  addTplItem:()=>{const it=parseLines(val('ti-text'));if(!it.length)return;S.templates.find(t=>t.id===S.tplSel).items.push(...it);render()},
+  openImport:el=>{S.modal={type:'import',target:el.dataset.target,text:'',name:'',parsed:null};render()},
+  impPreview:()=>{const m=S.modal;m.text=val('imp-text');m.name=val('imp-name');m.parsed=parseLines(m.text);render()},
+  impSave:()=>{const m=S.modal;m.name=val('imp-name').trim();const items=m.parsed;
+    if(m.target==='lib'&&!m.name)return toast('Name the template first.');
+    if(m.name){const id=uid('tp');S.templates.push({id,name:m.name,items:items.map(i=>({type:i.type,text:i.text}))});if(m.target==='lib')S.tplSel=id}
+    if(m.target==='job'){curJob().checklist.push(...mkCl(items))}
+    toast(items.filter(i=>i.type!=='head').length+' items imported');S.modal=null;render()},
+  applyTpl:()=>{const t=S.templates.find(x=>x.id===val('cl-tpl'));curJob().checklist.push(...mkCl(t.items));toast(t.name+' applied');render()},
+  addClItem:()=>{const it=parseLines(val('cl-new'));if(!it.length)return;curJob().checklist.push(...mkCl(it));render()},
+  addTask:()=>{const n=val('tk-name').trim();if(!n)return toast('Name the task.');curJob().tasks.push({id:uid('t'),name:n,budget:parseFloat(val('tk-bud'))||0,assignees:[],start:null,end:null,status:'Not started'});render()},
+  addPart:async()=>{const j=curJob(),d=val('pp-desc').trim();if(!d)return toast('Describe the part.');
+    const f=document.getElementById('pp-file').files[0];const inv=f?await readAtt(f):null;
+    const src=val('pp-src');j.parts.push({id:uid('pa'),desc:d,qty:parseFloat(val('pp-qty'))||1,cost:parseFloat(val('pp-cost'))||0,src,vendor:val('pp-vendor'),by:src==='Purchased by tech'?(isOffice()?'':S.user):'',reimb:val('pp-reimb')==='1',invoice:inv});
+    toast(needsInv({src})&&!inv?'Added. Remember to attach the invoice.':'Part added');render()},
+  delPart:el=>{const j=curJob();j.parts=j.parts.filter(p=>p.id!==el.dataset.id);render()},
+  delPhoto:el=>{const j=curJob();j.photos=j.photos.filter(p=>p.id!==el.dataset.id);render()},
+  zoom:el=>{const j=curJob(),id=el.dataset.src,p=j.photos.find(x=>x.id===id),pa=j.parts.find(x=>x.id===id);S.modal={type:'zoom',src:p?p.src:pa.invoice.src};render()}
+};
+const chg={
+  user:el=>{S.user=el.value;S.drawer=null;S.view=isOffice()?'dispatch':'mywork';render()},
+  fStatus:el=>{S.f.status=el.value;render()},fCust:el=>{S.f.cust=el.value;render()},
+  timeJob:el=>{S.time.job=el.value;S.time.date=val('tv-date')||S.time.date;render()},
+  timeEmp:el=>{S.time.emp=el.value;render()},
+  tsRange:()=>{S.ts.from=val('ts-from');S.ts.to=val('ts-to');if(S.ts.to<S.ts.from)S.ts.to=S.ts.from;S.ts.out='';render()},
+  tsFmt:el=>{S.ts.fmt=el.value;S.ts.out='';render()},tsIncl:el=>{S.ts.incl=el.value;S.ts.out='';render()},tsAgain:el=>{S.ts.again=el.checked;S.ts.out='';render()},
+  conRate:el=>{con(el.dataset.id).rates[el.dataset.f]=parseFloat(el.value)||0;toast('Rate updated')},
+  conNum:el=>{con(el.dataset.id)[el.dataset.f]=parseFloat(el.value)||0;toast('Updated')},
+  jobField:el=>{const j=curJob(),f=el.dataset.f;
+    if(f==='status'&&el.value==='Complete'&&clLeft(j)){toast('Finish the checklist first: '+clLeft(j)+' item'+(clLeft(j)>1?'s are':' is')+' still open.');render();return}
+    j[f]=el.value;
+    if(f==='custId'||f==='locId')j.equip=[];
+    if(f==='custId'){j.locId=(S.locations.find(l=>l.custId===el.value)||{}).id;j.contractId=(S.contracts.find(k=>k.custId===el.value)||{}).id}
+    if(f==='contractId')toast('Pricing now follows '+con(j.contractId).name);
+    if(f==='start'||f==='end'){if(!j.end||j.end<j.start)j.end=j.start}
+    render()},
+  jobTrip:el=>{curJob().trip=el.checked;render()},
+  taskStatus:el=>{curJob().tasks.find(t=>t.id===el.dataset.t).status=el.value;render()},
+  clCheck:el=>{const c=curJob().checklist.find(x=>x.id===el.dataset.id);c.done=el.checked;c.by=el.checked?actor():'';c.at=el.checked?nowStr():'';const j=curJob();if(j.status==='Complete'&&clLeft(j)&&!j.override){j.status='In progress';toast('Checklist item reopened, so this call is back In progress')}render()},
+  clVal:el=>{const c=curJob().checklist.find(x=>x.id===el.dataset.id);c.val=el.value.trim();c.by=actor();c.at=nowStr();const j=curJob();if(j.status==='Complete'&&clLeft(j)&&!j.override){j.status='In progress';toast('Reading cleared, so this call is back In progress')}render()},
+  partInv:async el=>{const f=el.files[0];if(!f)return;const p=curJob().parts.find(x=>x.id===el.dataset.id);p.invoice=await readAtt(f);toast('Invoice attached');render()},
+  photoUp:async el=>{const j=curJob();for(const f of el.files){const a=await readAtt(f);j.photos.push({id:uid('ph'),src:a.src,name:a.name,phase:'During',cap:'',by:actor(),at:nowStr()})}toast(el.files.length+' photo'+(el.files.length>1?'s':'')+' added');render()},
+  phPhase:el=>{curJob().photos.find(p=>p.id===el.dataset.id).phase=el.value},
+  phCap:el=>{curJob().photos.find(p=>p.id===el.dataset.id).cap=el.value},
+  pmBasis:el=>{con(el.dataset.id).pm.basis=el.value;render()},pmLoc:el=>{const p=con(el.dataset.id).pm;if(el.value==='')delete p.locPrices[el.dataset.loc];else p.locPrices[el.dataset.loc]=parseFloat(el.value)||0;toast('PM price saved')},pmDefault:el=>{con(el.dataset.id).pm.locDefault=parseFloat(el.value)||0;toast('PM price saved')},pmEq:el=>{con(el.dataset.id).pm.eqPrices[el.dataset.type]=parseFloat(el.value)||0;render()},jobPmParts:el=>{curJob().pmParts=el.checked;render()},
+  conMethod:el=>{con(el.dataset.id).method=el.value;toast('Billing method updated');render()},empCost:el=>{emp(el.dataset.id).cost=parseFloat(el.value)||0;toast('Cost rate updated')},jobPrice:el=>{curJob().fixedPrice=parseFloat(el.value)||0;render()},
+  billField:el=>{S.bill[el.dataset.f]=el.value;S.bill.out='';render()},billFmt:el=>{S.bill.fmt=el.value;S.bill.out='';render()},
+  jobEquip:el=>{const j=curJob(),i=j.equip.indexOf(el.dataset.id);if(el.checked&&i<0)j.equip.push(el.dataset.id);if(!el.checked&&i>=0)j.equip.splice(i,1);render()},
+  partFilter:el=>{S.partFilter=el.value;render()},
+  tplName:el=>{S.templates.find(t=>t.id===S.tplSel).name=el.value.trim()||'Untitled';render()},
+  njKind:el=>{capNJ();S.modal.kind=el.value;render()},
+  njCust:el=>{capNJ();S.modal.custId=el.value;render()},
+  impFile:el=>{const f=el.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('#imp-text').value=r.result;if(!val('imp-name'))$('#imp-name').value=f.name.replace(/\.[^.]+$/,'')};r.readAsText(f)}
+};
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(el&&acts[el.dataset.act])acts[el.dataset.act](el,e)});
+document.addEventListener('change',e=>{const el=e.target.closest('[data-chg]');if(el&&chg[el.dataset.chg])chg[el.dataset.chg](el)});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){if(S.modal){S.modal=null;render()}else if(S.drawer){S.drawer=null;render()}}
+  if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.enter&&acts[e.target.dataset.enter]){e.preventDefault();acts[e.target.dataset.enter](e.target)}});
+document.addEventListener('dragstart',e=>{const c=e.target.closest&&e.target.closest('[data-drag]');if(c)e.dataTransfer.setData('text/plain',c.dataset.drag)});
+document.addEventListener('dragover',e=>{if(e.target.closest&&e.target.closest('[data-drop]'))e.preventDefault()});
+document.addEventListener('drop',e=>{
+  const c=e.target.closest&&e.target.closest('[data-drop]');if(!c)return;e.preventDefault();
+  const key=e.dataTransfer.getData('text/plain');if(!key)return;
+  const {j,o,tid}=targetOf(key),em=c.dataset.emp,d=c.dataset.date;
+  if(!o.assignees.includes(em))o.assignees.push(em);
+  if(!o.start){o.start=d;o.end=d}else{if(d<o.start)o.start=d;if(d>o.end)o.end=d}
+  if(!tid){if(!o.lead)o.lead=em;if(o.status==='Unassigned')o.status='Scheduled'}
+  toast(emp(em).name+' assigned to '+j.id+' on '+fmtD(d));render()});
+render();
+</script>
