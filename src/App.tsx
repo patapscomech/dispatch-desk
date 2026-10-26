@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import { isApprover, isOffice, ROLE_LABEL, type Job, type Profile, type Task, type Customer, type Location, type Template } from './types'
-import { cached, clearFailed, onSync, startSync, flush, type SyncState } from './lib/offline'
+import { isApprover, isOffice, ROLE_LABEL, type Job, type Profile, type Task, type Customer, type Location, type Template, type Contract, type Assignment } from './types'
+import { cached, clearFailed, onSync, startSync, flush, remember, type SyncState } from './lib/offline'
+import { kvGet } from './lib/idb'
 import { prefetchMyWork } from './lib/field'
 import MyWork from './views/MyWork'
 import Dispatch from './views/Dispatch'
@@ -24,7 +25,9 @@ export interface Data {
   customers: Customer[]
   locations: Location[]
   templates: Template[]
+  contracts: Contract[]
   reload: () => Promise<void>
+  addLocalJob: (job: Job, a: Assignment) => Promise<void>
   openJob: (id: string) => void
   goHours: (jobId: string) => void
 }
@@ -33,7 +36,7 @@ type Tab = 'work' | 'dispatch' | 'jobs' | 'customers' | 'checklists' | 'hours' |
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
-  const [data, setData] = useState<Omit<Data, 'reload' | 'openJob' | 'goHours'> | null>(null)
+  const [data, setData] = useState<Omit<Data, 'reload' | 'openJob' | 'goHours' | 'addLocalJob'> | null>(null)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('work')
   const [jobId, setJobId] = useState<string | null>(null)
@@ -41,6 +44,12 @@ export default function App() {
   const [sync, setSync] = useState<SyncState>({ waiting: 0, failed: [], online: true })
 
   useEffect(() => { startSync(); return onSync(setSync) }, [])
+  const prevWaiting = useRef(0)
+  useEffect(() => {
+    if (prevWaiting.current > 0 && sync.waiting === 0) load()
+    prevWaiting.current = sync.waiting
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sync.waiting])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -53,19 +62,20 @@ export default function App() {
     await flush()
     const uid = session.user.id
     const r = await cached(`base:${uid}`, async () => {
-      const [p, j, t, c, l, tp] = await Promise.all([
+      const [p, j, t, c, l, tp, k] = await Promise.all([
         supabase.from('profiles').select('*').order('full_name'),
         supabase.from('jobs').select('*').order('number'),
         supabase.from('job_tasks').select('*').order('name'),
         supabase.from('customers').select('*').order('name'),
         supabase.from('locations').select('*').order('name'),
         supabase.from('checklist_templates').select('*').order('name'),
+        supabase.from('contracts').select('*').order('name'),
       ])
-      const err = p.error || j.error || t.error || c.error || l.error || tp.error
+      const err = p.error || j.error || t.error || c.error || l.error || tp.error || k.error
       if (err) throw new Error(err.message)
       return {
         people: p.data as Profile[], jobs: j.data as Job[], tasks: t.data as Task[],
-        customers: c.data as Customer[], locations: l.data as Location[], templates: tp.data as Template[],
+        customers: c.data as Customer[], locations: l.data as Location[], templates: tp.data as Template[], contracts: k.data as Contract[],
       }
     })
     if (!r.data) {
@@ -98,7 +108,16 @@ export default function App() {
     )
   if (!data) return <div className="center muted">Loading…</div>
 
-  const d: Data = { ...data, reload: load, openJob: (id) => setJobId(id), goHours: (id) => { setHoursJob(id); setJobId(null); setTab('hours') } }
+  async function addLocalJob(job: Job, a: Assignment) {
+    const next = { ...data!, jobs: [...data!.jobs.filter((j) => j.id !== job.id), job] }
+    setData(next)
+    const { me: _me, ...base } = next
+    void _me
+    await remember(`base:${session!.user.id}`, base)
+    const mine = (await kvGet<Assignment[]>(`mywork:${session!.user.id}`)) ?? []
+    await remember(`mywork:${session!.user.id}`, [...mine, a])
+  }
+  const d: Data = { ...data, reload: load, addLocalJob, openJob: (id) => setJobId(id), goHours: (id) => { setHoursJob(id); setJobId(null); setTab('hours') } }
   const { me } = d
   if (!me.active)
     return (

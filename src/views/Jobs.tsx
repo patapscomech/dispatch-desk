@@ -4,14 +4,16 @@ import type { Data } from '../App'
 import { PRIORITIES, STATUS_LABEL, type JobStatus } from '../types'
 
 export default function Jobs({ d }: { d: Data }) {
-  const blank = { number: '', title: '', kind: 'ticket' as 'ticket' | 'project', customer_id: '', location_id: '', priority: 'Normal', description: '', prevailing_wage: false }
+  const blank = { number: '', title: '', kind: 'ticket' as 'ticket' | 'project', customer_id: '', location_id: '', contract_id: '', priority: 'Normal', description: '', prevailing_wage: false }
   const [f, setF] = useState(blank)
   const [err, setErr] = useState('')
   const [filter, setFilter] = useState<'active' | JobStatus | 'all'>('active')
   const [q, setQ] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [selfOnly, setSelfOnly] = useState(false)
 
   const locs = d.locations.filter((l) => l.customer_id === f.customer_id)
+  const ctrs = d.contracts.filter((c) => c.customer_id === f.customer_id && c.active)
   const cust = (id: string | null) => d.customers.find((c) => c.id === id)?.name
   const loc = (id: string | null) => d.locations.find((l) => l.id === id)?.name
 
@@ -21,7 +23,7 @@ export default function Jobs({ d }: { d: Data }) {
     if (f.kind === 'ticket' && !f.location_id) return setErr('Choose the customer and location for a service ticket.')
     const { data, error } = await supabase.from('jobs').insert({
       number: f.number.trim(), title: f.title.trim(), kind: f.kind, customer_id: f.customer_id || null,
-      location_id: f.location_id || null, priority: f.priority, description: f.description.trim(), prevailing_wage: f.prevailing_wage,
+      location_id: f.location_id || null, contract_id: f.contract_id || null, priority: f.priority, description: f.description.trim(), prevailing_wage: f.prevailing_wage,
     }).select().single()
     if (error) return setErr(error.message.includes('duplicate') ? 'That job number already exists.' : error.message)
     setF(blank); setShowForm(false)
@@ -31,6 +33,7 @@ export default function Jobs({ d }: { d: Data }) {
 
   const list = d.jobs
     .filter((j) => (filter === 'all' ? true : filter === 'active' ? j.status !== 'closed' : j.status === filter))
+    .filter((j) => !selfOnly || j.self_dispatched)
     .filter((j) => !q.trim() || `${j.number} ${j.title} ${cust(j.customer_id) ?? ''} ${loc(j.location_id) ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()))
 
   return (
@@ -52,7 +55,7 @@ export default function Jobs({ d }: { d: Data }) {
           <label>Title<input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} required /></label>
           <div className="grid2">
             <label>Customer
-              <select value={f.customer_id} onChange={(e) => setF({ ...f, customer_id: e.target.value, location_id: '' })}>
+              <select value={f.customer_id} onChange={(e) => setF({ ...f, customer_id: e.target.value, location_id: '', contract_id: '' })}>
                 <option value="">Choose…</option>{d.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </label>
@@ -62,6 +65,11 @@ export default function Jobs({ d }: { d: Data }) {
               </select>
             </label>
           </div>
+          <label>Contract
+            <select value={f.contract_id} onChange={(e) => setF({ ...f, contract_id: e.target.value })} disabled={!f.customer_id}>
+              <option value="">None yet</option>{ctrs.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.type})</option>)}
+            </select>
+          </label>
           <div className="grid2">
             <label>Priority<select value={f.priority} onChange={(e) => setF({ ...f, priority: e.target.value })}>{PRIORITIES.map((p) => <option key={p}>{p}</option>)}</select></label>
             <label className="check" style={{ alignSelf: 'end' }}><input type="checkbox" checked={f.prevailing_wage} onChange={(e) => setF({ ...f, prevailing_wage: e.target.checked })} /> Prevailing wage</label>
@@ -81,13 +89,14 @@ export default function Jobs({ d }: { d: Data }) {
         </select>
       </div>
 
+      <label className="check"><input type="checkbox" checked={selfOnly} onChange={(e) => setSelfOnly(e.target.checked)} /> Only calls technicians dispatched to themselves</label>
       {list.map((j) => (
         <button className="card jobrow" key={j.id} onClick={() => d.openJob(j.id)}>
           <div className="row between">
-            <span><b>{j.number}</b> · {j.title}</span>
+            <span><b>{j.number}</b> · {j.title}{j.self_dispatched && <span className="pill selfd"> self-dispatched</span>}</span>
             <span className={'pill st-' + j.status}>{STATUS_LABEL[j.status]}</span>
           </div>
-          <div className="muted sm">{[j.kind === 'project' ? 'Project' : 'Ticket', cust(j.customer_id), loc(j.location_id), j.priority !== 'Normal' && j.priority].filter(Boolean).join(' · ')}</div>
+          <div className="muted sm">{[j.kind === 'project' ? 'Project' : 'Ticket', cust(j.customer_id), loc(j.location_id), d.contracts.find((c) => c.id === j.contract_id)?.name, j.priority !== 'Normal' && j.priority].filter(Boolean).join(' · ')}</div>
         </button>
       ))}
       {!list.length && <p className="muted">Nothing matches.</p>}

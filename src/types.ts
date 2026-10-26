@@ -27,6 +27,9 @@ export interface Job {
   title: string
   customer_id: string | null
   location_id: string | null
+  contract_id: string | null
+  created_by: string | null
+  self_dispatched: boolean
   status: JobStatus
   priority: (typeof PRIORITIES)[number]
   description: string
@@ -37,6 +40,16 @@ export interface Job {
   close_override_reason: string | null
   close_override_by: string | null
   close_override_at: string | null
+}
+export interface Contract {
+  id: string
+  customer_id: string
+  name: string
+  type: 'Service' | 'Project' | 'Emergency'
+  prevailing_wage: boolean
+  start_date: string | null
+  end_date: string | null
+  active: boolean
 }
 export interface Location {
   id: string

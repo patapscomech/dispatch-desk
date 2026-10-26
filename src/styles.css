@@ -73,3 +73,4 @@ fieldset.people{border:1px solid var(--line);border-radius:10px;display:grid;gri
 .board th,.board td{min-width:84px}
 .row>input.grow{min-width:140px}
 .overlay .tab{padding:10px 9px}
+.pill.selfd{color:var(--accent);border-color:var(--accent);margin-left:6px}

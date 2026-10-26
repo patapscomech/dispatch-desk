@@ -4,11 +4,13 @@ import type { Assignment } from '../types'
 import { STATUS_LABEL } from '../types'
 import { fmtDay, today } from '../lib/dates'
 import { loadMyWork } from '../lib/field'
+import NewCall from './NewCall'
 
 export default function MyWork({ d }: { d: Data }) {
   const [asg, setAsg] = useState<Assignment[]>([])
   const [cached, setCached] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -25,6 +27,7 @@ export default function MyWork({ d }: { d: Data }) {
 
   return (
     <section>
+      {creating ? <NewCall d={d} onClose={() => setCreating(false)} /> : <button className="btn primary" onClick={() => setCreating(true)}>+ New call for myself</button>}
       {cached && <p className="warn">No signal: showing the calls saved on this phone. Changes you make are kept and sent when you are back in coverage.</p>}
       {loading && <p className="muted">Loading…</p>}
       {!loading && !dates.length && <p className="muted">Nothing is assigned to you in the next two weeks.</p>}

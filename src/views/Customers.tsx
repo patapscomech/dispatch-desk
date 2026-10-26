@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import type { Data } from '../App'
-import type { Equipment } from '../types'
+import type { Contract, Equipment } from '../types'
 
 export const EQUIP_TYPES = ['RTU', 'AHU', 'Chiller', 'Boiler', 'Pump', 'Cooling tower', 'Split system', 'VAV box', 'Exhaust fan', 'Backflow preventer', 'Water heater', 'Other']
 
@@ -50,6 +50,7 @@ export default function Customers({ d }: { d: Data }) {
   const [name, setName] = useState('')
   const [loc, setLoc] = useState({ name: '', address: '', access_notes: '' })
   const [editing, setEditing] = useState<Equipment | 'new' | null>(null)
+  const [k, setK] = useState({ name: '', type: 'Service', prevailing_wage: false, start_date: '', end_date: '' })
 
   const locs = d.locations.filter((l) => l.customer_id === custId)
   const loadEquip = useCallback(async () => {
@@ -85,6 +86,19 @@ export default function Customers({ d }: { d: Data }) {
     loadEquip()
   }
 
+  const contractsOf = d.contracts.filter((c) => c.customer_id === custId)
+  async function addContract(e: React.FormEvent) {
+    e.preventDefault()
+    const { error } = await supabase.from('contracts').insert({ customer_id: custId, name: k.name.trim(), type: k.type, prevailing_wage: k.prevailing_wage, start_date: k.start_date || null, end_date: k.end_date || null })
+    if (error) return setErr(error.message.includes('duplicate') ? 'This customer already has a contract with that name.' : error.message)
+    setK({ name: '', type: 'Service', prevailing_wage: false, start_date: '', end_date: '' }); setErr('')
+    d.reload()
+  }
+  async function toggleContract(c: Contract) {
+    const { error } = await supabase.from('contracts').update({ active: !c.active }).eq('id', c.id)
+    if (error) setErr(error.message)
+    d.reload()
+  }
   const cur = d.locations.find((l) => l.id === locId)
   return (
     <section>
@@ -101,6 +115,29 @@ export default function Customers({ d }: { d: Data }) {
         </form>
       </div>
       {err && <p className="err" role="alert">{err}</p>}
+
+      {custId && (
+        <div className="card form">
+          <b>Contracts</b>
+          {contractsOf.map((c) => (
+            <div className="row between" key={c.id} style={c.active ? undefined : { opacity: 0.6 }}>
+              <span>{c.name} <span className="muted sm">· {c.type}{c.prevailing_wage ? ' · prevailing wage' : ''}{c.start_date || c.end_date ? ` · ${c.start_date ?? ''} to ${c.end_date ?? ''}` : ''}</span></span>
+              <button className="btn ghost" onClick={() => toggleContract(c)}>{c.active ? 'Turn off' : 'Turn on'}</button>
+            </div>
+          ))}
+          {!contractsOf.length && <div className="muted sm">No contracts yet. Technicians cannot create a call for this customer until it has an active contract. Rates and pricing are added in the billing phase.</div>}
+          <form className="form" onSubmit={addContract}>
+            <div className="grid2">
+              <input placeholder="New contract name" value={k.name} onChange={(e) => setK({ ...k, name: e.target.value })} required />
+              <select value={k.type} onChange={(e) => setK({ ...k, type: e.target.value })} aria-label="Contract type"><option>Service</option><option>Project</option><option>Emergency</option></select>
+              <label>Starts<input type="date" value={k.start_date} onChange={(e) => setK({ ...k, start_date: e.target.value })} /></label>
+              <label>Ends<input type="date" value={k.end_date} onChange={(e) => setK({ ...k, end_date: e.target.value })} /></label>
+            </div>
+            <label className="check"><input type="checkbox" checked={k.prevailing_wage} onChange={(e) => setK({ ...k, prevailing_wage: e.target.checked })} /> Prevailing wage contract</label>
+            <button className="btn">Add contract</button>
+          </form>
+        </div>
+      )}
 
       {custId && (
         <div className="card form">

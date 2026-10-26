@@ -75,6 +75,7 @@ const opLabel = (op: Op) => (op.kind === 'upload' ? 'photo upload' : `${op.kind}
 let flushing: Promise<void> | null = null
 export function flush(): Promise<void> {
   if (flushing) return flushing
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return Promise.resolve()
   flushing = (async () => {
     const items = await queueAll<Op>()
     if (items.length) {

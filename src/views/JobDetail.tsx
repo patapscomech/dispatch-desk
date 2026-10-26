@@ -224,6 +224,16 @@ export default function JobDetail({ d, id, onClose }: { d: Data; id: string; onC
                   {statuses.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select>
               : <span className={'pill st-' + job.status}>{STATUS_LABEL[job.status]}</span>}
           </div>
+          {(() => {
+            const k = d.contracts.find((c) => c.id === job.contract_id)
+            const opts = d.contracts.filter((c) => c.customer_id === job.customer_id && (c.active || c.id === job.contract_id))
+            return office
+              ? <label className="inline sm">Contract
+                  <select value={job.contract_id ?? ''} style={{ width: 'auto' }} onChange={(e) => { const v = e.target.value || null; change((x) => ({ ...x, job: { ...x.job, contract_id: v } })); push({ kind: 'update', table: 'jobs', values: { contract_id: v }, match: { id } }) }}>
+                    <option value="">None</option>{opts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+              : <div className="sm muted">{k ? `Contract: ${k.name}` : 'No contract on this call'}</div>
+          })()}
+          {job.self_dispatched && <div className="sm muted">Created by {nm(job.created_by ?? '')} for themselves</div>}
           {location?.address && <div className="sm muted">{location.address}</div>}
           {location?.access_notes && <div className="sm"><b>Access:</b> {location.access_notes}</div>}
           {open > 0 && job.status !== 'complete' && job.status !== 'closed' && (
