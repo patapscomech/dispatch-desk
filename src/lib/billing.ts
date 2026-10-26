@@ -1,14 +1,16 @@
 // Billing math. Every billed amount rounds DOWN to the cent.
 export const fl = (n: number) => Math.floor(n * 100 + 1e-6) / 100
 
-export interface Rate { rate_class: string; label: string; regular: number; overtime: number }
+export type Period = 'regular' | 'after_hours' | 'holiday'
+export const PERIOD_LABEL: Record<Period, string> = { regular: 'regular', after_hours: 'after hours', holiday: 'Sunday and holiday' }
+export interface Rate { rate_class: string; label: string; regular: number; overtime: number; holiday?: number | null }
 export interface Terms {
   materials_multiplier: number
   sub_multiplier: number
   rental_multiplier: number
   trip_charge: number
 }
-export interface LaborIn { hours: number; classification: string; after_hours: boolean }
+export interface LaborIn { hours: number; classification: string; period: Period }
 export interface PartIn { description: string; qty: number; unit_cost: number; source: string }
 export interface Line { kind: 'labor' | 'material' | 'sub' | 'rental' | 'trip'; description: string; qty: number; unit: number; amount: number }
 
@@ -24,8 +26,9 @@ export function laborLines(entries: LaborIn[], rates: Rate[]): { lines: Line[]; 
   for (const e of entries) {
     const r = rateFor(rates, e.classification)
     if (!r) { missing.push(e); continue }
-    const unit = fl(e.after_hours ? r.overtime : r.regular)
-    const name = `Labor, ${r.label || r.rate_class}, ${e.after_hours ? 'overtime' : 'regular'}`
+    const price = e.period === 'holiday' ? (r.holiday ?? r.overtime) : e.period === 'after_hours' ? r.overtime : r.regular
+    const unit = fl(price)
+    const name = `Labor, ${r.label || r.rate_class}, ${PERIOD_LABEL[e.period]}`
     const key = `${name}|${unit}`
     const g = groups.get(key) ?? { kind: 'labor' as const, description: name, qty: 0, unit, amount: 0 }
     g.qty = Math.round((g.qty + Number(e.hours)) * 100) / 100

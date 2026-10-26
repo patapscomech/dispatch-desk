@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import { CLASSES } from '../types'
 
-interface RateRow { rate_class: string; label: string; regular: string; overtime: string }
+interface RateRow { rate_class: string; label: string; regular: string; overtime: string; holiday: string }
 interface TermsRow { billing_method: string; materials_multiplier: string; sub_multiplier: string; rental_multiplier: string; trip_charge: string; notes: string }
 
 const METHODS: Record<string, string> = {
@@ -21,7 +21,7 @@ export default function ContractRates({ contractId }: { contractId: string }) {
     ;(async () => {
       const [c, r] = await Promise.all([
         supabase.from('contracts').select('billing_method,materials_multiplier,sub_multiplier,rental_multiplier,trip_charge,notes').eq('id', contractId).single(),
-        supabase.from('contract_rates').select('rate_class,label,regular,overtime').eq('contract_id', contractId),
+        supabase.from('contract_rates').select('rate_class,label,regular,overtime,holiday').eq('contract_id', contractId),
       ])
       if (c.error) return setMsg(c.error.message)
       const t = c.data as Record<string, unknown>
@@ -30,7 +30,7 @@ export default function ContractRates({ contractId }: { contractId: string }) {
         rental_multiplier: String(t.rental_multiplier), trip_charge: String(t.trip_charge), notes: String(t.notes ?? ''),
       })
       setRates(((r.data ?? []) as Record<string, unknown>[]).map((x) => ({
-        rate_class: String(x.rate_class), label: String(x.label), regular: String(x.regular), overtime: String(x.overtime),
+        rate_class: String(x.rate_class), label: String(x.label), regular: String(x.regular), overtime: String(x.overtime), holiday: x.holiday == null ? '' : String(x.holiday),
       })))
     })()
   }, [open, terms, contractId])
@@ -52,7 +52,7 @@ export default function ContractRates({ contractId }: { contractId: string }) {
     if (del.error) return setMsg(del.error.message)
     if (rates.length) {
       const ins = await supabase.from('contract_rates').insert(rates.map((r) => ({
-        contract_id: contractId, rate_class: r.rate_class, label: r.label.trim(), regular: Number(r.regular), overtime: Number(r.overtime),
+        contract_id: contractId, rate_class: r.rate_class, label: r.label.trim(), regular: Number(r.regular), overtime: Number(r.overtime), holiday: r.holiday === '' ? null : Number(r.holiday),
       })))
       if (ins.error) return setMsg(ins.error.message)
     }
@@ -79,7 +79,8 @@ export default function ContractRates({ contractId }: { contractId: string }) {
           <span style={{ minWidth: 110 }}>{r.rate_class === 'All' ? 'Everyone' : r.rate_class}</span>
           <input placeholder="Customer's name for it" value={r.label} onChange={(e) => setRate(i, { label: e.target.value })} style={{ width: 150 }} />
           <input aria-label="Regular rate" inputMode="decimal" placeholder="Regular" value={r.regular} onChange={(e) => setRate(i, { regular: e.target.value })} style={{ width: 80 }} />
-          <input aria-label="Overtime rate" inputMode="decimal" placeholder="Overtime" value={r.overtime} onChange={(e) => setRate(i, { overtime: e.target.value })} style={{ width: 80 }} />
+          <input aria-label="Overtime rate" inputMode="decimal" placeholder="After hrs" value={r.overtime} onChange={(e) => setRate(i, { overtime: e.target.value })} style={{ width: 80 }} />
+          <input aria-label="Sunday and holiday rate" inputMode="decimal" placeholder="Sun/hol" value={r.holiday} onChange={(e) => setRate(i, { holiday: e.target.value })} style={{ width: 80 }} />
           <button type="button" className="btn ghost" onClick={() => setRates(rates.filter((_, j) => j !== i))}>Remove</button>
         </div>
       ))}
@@ -87,13 +88,13 @@ export default function ContractRates({ contractId }: { contractId: string }) {
       {free.length > 0 && (
         <div className="row">
           {free.map((c) => (
-            <button type="button" key={c} className="btn ghost" onClick={() => setRates([...rates, { rate_class: c, label: '', regular: '', overtime: '' }])}>
+            <button type="button" key={c} className="btn ghost" onClick={() => setRates([...rates, { rate_class: c, label: '', regular: '', overtime: '', holiday: '' }])}>
               + {c === 'All' ? 'One rate for everyone' : c}
             </button>
           ))}
         </div>
       )}
-      <div className="muted sm">"Everyone" is used for anyone without their own class rate. Overtime means after-hours billing (set on each hours entry).</div>
+      <div className="muted sm">"Everyone" is used for anyone without their own class rate. Each hours entry is marked regular, after hours, or Sunday/holiday. A blank Sun/hol price uses the after-hours price. Priority levels do not change price.</div>
       <b className="sm">Markups (1.08 = cost plus 8%, 1 = at cost)</b>
       <div className="grid2">
         <label>Materials<input inputMode="decimal" value={terms.materials_multiplier} onChange={(e) => setT({ materials_multiplier: e.target.value })} /></label>

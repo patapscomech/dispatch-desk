@@ -10,33 +10,51 @@ const county: Rate[] = [
 const schools: Rate[] = [{ rate_class: 'All', label: 'Mechanic', regular: 120, overtime: 120 }]
 const t: Terms = { materials_multiplier: 1.08, sub_multiplier: 1.08, rental_multiplier: 1, trip_charge: 0 }
 
+const sheet3: Rate[] = [
+  { rate_class: 'Foreman', label: 'Lead Technician', regular: 130, overtime: 175, holiday: 200 },
+  { rate_class: 'Helper', label: 'Technician Helper', regular: 70, overtime: 90, holiday: 110 },
+]
 describe('billing', () => {
+  it('three periods: regular, after hours, Sunday and holiday', () => {
+    const { lines } = laborLines([
+      { hours: 2, classification: 'Foreman', period: 'regular' },
+      { hours: 2, classification: 'Foreman', period: 'after_hours' },
+      { hours: 2, classification: 'Foreman', period: 'holiday' },
+      { hours: 3, classification: 'Helper', period: 'holiday' },
+    ], sheet3)
+    expect(lines.map((l) => l.amount)).toEqual([260, 350, 400, 330])
+    expect(lines[2].description).toBe('Labor, Lead Technician, Sunday and holiday')
+  })
+  it('no holiday price falls back to the after-hours price', () => {
+    const { lines } = laborLines([{ hours: 1, classification: 'Apprentice', period: 'holiday' }], county)
+    expect(lines[0].amount).toBe(90)
+  })
   it('floors to the cent', () => { expect(fl(10.999)).toBe(10.99); expect(fl(1.08 * 100)).toBe(108) })
   it('uses the class rate, regular or overtime', () => {
     const { lines } = laborLines([
-      { hours: 4, classification: 'Journeyman', after_hours: false },
-      { hours: 2, classification: 'Journeyman', after_hours: true },
-      { hours: 3, classification: 'Foreman', after_hours: false },
+      { hours: 4, classification: 'Journeyman', period: 'regular' },
+      { hours: 2, classification: 'Journeyman', period: 'after_hours' },
+      { hours: 3, classification: 'Foreman', period: 'regular' },
     ], county)
     expect(lines.map((l) => l.amount).sort((a, b) => a - b)).toEqual([280, 330, 468])
   })
   it('groups the same class and period into one line', () => {
     const { lines } = laborLines([
-      { hours: 1.5, classification: 'Apprentice', after_hours: false },
-      { hours: 2.25, classification: 'Apprentice', after_hours: false },
+      { hours: 1.5, classification: 'Apprentice', period: 'regular' },
+      { hours: 2.25, classification: 'Apprentice', period: 'regular' },
     ], county)
     expect(lines).toHaveLength(1); expect(lines[0].qty).toBe(3.75); expect(lines[0].amount).toBe(270)
   })
   it('one flat rate for everyone', () => {
     expect(rateFor(schools, 'Helper')?.regular).toBe(120)
     const { lines, missing } = laborLines([
-      { hours: 8, classification: 'Foreman', after_hours: false },
-      { hours: 8, classification: 'Apprentice', after_hours: true },
+      { hours: 8, classification: 'Foreman', period: 'regular' },
+      { hours: 8, classification: 'Apprentice', period: 'after_hours' },
     ], schools)
     expect(missing).toEqual([]); expect(total(lines)).toBe(1920)
   })
   it('reports hours with no rate', () => {
-    const { missing } = laborLines([{ hours: 2, classification: 'Helper', after_hours: false }], county)
+    const { missing } = laborLines([{ hours: 2, classification: 'Helper', period: 'regular' }], county)
     expect(missing).toHaveLength(1)
   })
   it('marks up materials and subs, passes rentals through, rounds down', () => {
