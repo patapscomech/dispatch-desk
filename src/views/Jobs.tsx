@@ -1,98 +1,96 @@
 import { useState } from 'react'
 import { supabase } from '../supabase'
 import type { Data } from '../App'
+import { PRIORITIES, STATUS_LABEL, type JobStatus } from '../types'
 
 export default function Jobs({ d }: { d: Data }) {
-  const [number, setNumber] = useState('')
-  const [title, setTitle] = useState('')
-  const [kind, setKind] = useState<'ticket' | 'project'>('ticket')
-  const [customer, setCustomer] = useState('')
-  const [pw, setPw] = useState(false)
+  const blank = { number: '', title: '', kind: 'ticket' as 'ticket' | 'project', customer_id: '', location_id: '', priority: 'Normal', description: '', prevailing_wage: false }
+  const [f, setF] = useState(blank)
   const [err, setErr] = useState('')
-  const [taskName, setTaskName] = useState<Record<string, string>>({})
-  const [showClosed, setShowClosed] = useState(false)
+  const [filter, setFilter] = useState<'active' | JobStatus | 'all'>('active')
+  const [q, setQ] = useState('')
+  const [showForm, setShowForm] = useState(false)
+
+  const locs = d.locations.filter((l) => l.customer_id === f.customer_id)
+  const cust = (id: string | null) => d.customers.find((c) => c.id === id)?.name
+  const loc = (id: string | null) => d.locations.find((l) => l.id === id)?.name
 
   async function add(e: React.FormEvent) {
     e.preventDefault()
     setErr('')
-    let customerId: string | null = null
-    const name = customer.trim()
-    if (name) {
-      const existing = d.customers.find((c) => c.name.toLowerCase() === name.toLowerCase())
-      if (existing) customerId = existing.id
-      else {
-        const { data, error } = await supabase.from('customers').insert({ name }).select().single()
-        if (error) return setErr(error.message)
-        customerId = data.id
-      }
-    }
-    const { error } = await supabase.from('jobs').insert({
-      number: number.trim(), title: title.trim(), kind, customer_id: customerId, prevailing_wage: pw,
-    })
+    if (f.kind === 'ticket' && !f.location_id) return setErr('Choose the customer and location for a service ticket.')
+    const { data, error } = await supabase.from('jobs').insert({
+      number: f.number.trim(), title: f.title.trim(), kind: f.kind, customer_id: f.customer_id || null,
+      location_id: f.location_id || null, priority: f.priority, description: f.description.trim(), prevailing_wage: f.prevailing_wage,
+    }).select().single()
     if (error) return setErr(error.message.includes('duplicate') ? 'That job number already exists.' : error.message)
-    setNumber(''); setTitle(''); setCustomer(''); setPw(false)
-    d.reload()
-  }
-  async function setStatus(id: string, status: 'open' | 'closed') {
-    const { error } = await supabase.from('jobs').update({ status }).eq('id', id)
-    if (error) setErr(error.message)
-    d.reload()
-  }
-  async function addTask(jobId: string) {
-    const name = (taskName[jobId] ?? '').trim()
-    if (!name) return
-    const { error } = await supabase.from('job_tasks').insert({ job_id: jobId, name })
-    if (error) return setErr(error.message.includes('duplicate') ? 'That task already exists on this job.' : error.message)
-    setTaskName({ ...taskName, [jobId]: '' })
-    d.reload()
+    setF(blank); setShowForm(false)
+    await d.reload()
+    d.openJob(data.id)
   }
 
-  const jobs = d.jobs.filter((j) => showClosed || j.status === 'open')
-  const cust = (id: string | null) => d.customers.find((c) => c.id === id)?.name
+  const list = d.jobs
+    .filter((j) => (filter === 'all' ? true : filter === 'active' ? j.status !== 'closed' : j.status === filter))
+    .filter((j) => !q.trim() || `${j.number} ${j.title} ${cust(j.customer_id) ?? ''} ${loc(j.location_id) ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()))
 
   return (
     <section>
-      <form className="card form" onSubmit={add}>
-        <h2>New ticket or project</h2>
-        <div className="grid2">
-          <label>Number<input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="T-1050 or P-212" required /></label>
-          <label>Type
-            <select value={kind} onChange={(e) => setKind(e.target.value as 'ticket' | 'project')}>
-              <option value="ticket">Service ticket</option>
-              <option value="project">Project</option>
-            </select>
-          </label>
-        </div>
-        <label>Title<input value={title} onChange={(e) => setTitle(e.target.value)} required /></label>
-        <label>Customer<input list="custs" value={customer} onChange={(e) => setCustomer(e.target.value)} />
-          <datalist id="custs">{d.customers.map((c) => <option key={c.id} value={c.name} />)}</datalist>
-        </label>
-        <label className="check"><input type="checkbox" checked={pw} onChange={(e) => setPw(e.target.checked)} /> Prevailing wage job</label>
-        <button className="btn primary">Add</button>
-      </form>
-      {err && <p className="err" role="alert">{err}</p>}
-
-      <label className="check"><input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} /> Show closed jobs</label>
-      {jobs.map((j) => (
-        <div className="card" key={j.id}>
-          <div className="row between">
-            <div><b>{j.number}</b> · {j.title}
-              <div className="muted sm">{j.kind === 'project' ? 'Project' : 'Service ticket'}{cust(j.customer_id) ? ' · ' + cust(j.customer_id) : ''}{j.prevailing_wage ? ' · prevailing wage' : ''}</div>
-            </div>
-            <button className="btn" onClick={() => setStatus(j.id, j.status === 'open' ? 'closed' : 'open')}>{j.status === 'open' ? 'Close' : 'Reopen'}</button>
+      <div className="row between">
+        <h2>Tickets and projects</h2>
+        <button className="btn primary" onClick={() => setShowForm(!showForm)}>{showForm ? 'Cancel' : 'New'}</button>
+      </div>
+      {showForm && (
+        <form className="card form" onSubmit={add}>
+          <div className="grid2">
+            <label>Number<input value={f.number} onChange={(e) => setF({ ...f, number: e.target.value })} placeholder="T-1050 or P-212" required /></label>
+            <label>Type
+              <select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as 'ticket' | 'project' })}>
+                <option value="ticket">Service ticket</option><option value="project">Project</option>
+              </select>
+            </label>
           </div>
-          {j.kind === 'project' && (
-            <div>
-              <div className="sm">Tasks: {d.tasks.filter((t) => t.job_id === j.id).map((t) => t.name).join(', ') || <span className="muted">none yet</span>}</div>
-              <div className="row">
-                <input className="grow" placeholder="New task name" value={taskName[j.id] ?? ''} onChange={(e) => setTaskName({ ...taskName, [j.id]: e.target.value })} />
-                <button className="btn" onClick={() => addTask(j.id)}>Add task</button>
-              </div>
-            </div>
-          )}
-        </div>
+          <label>Title<input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} required /></label>
+          <div className="grid2">
+            <label>Customer
+              <select value={f.customer_id} onChange={(e) => setF({ ...f, customer_id: e.target.value, location_id: '' })}>
+                <option value="">Choose…</option>{d.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+            <label>Location
+              <select value={f.location_id} onChange={(e) => setF({ ...f, location_id: e.target.value })} disabled={!f.customer_id}>
+                <option value="">Choose…</option>{locs.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="grid2">
+            <label>Priority<select value={f.priority} onChange={(e) => setF({ ...f, priority: e.target.value })}>{PRIORITIES.map((p) => <option key={p}>{p}</option>)}</select></label>
+            <label className="check" style={{ alignSelf: 'end' }}><input type="checkbox" checked={f.prevailing_wage} onChange={(e) => setF({ ...f, prevailing_wage: e.target.checked })} /> Prevailing wage</label>
+          </div>
+          <label>What needs doing<textarea rows={3} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></label>
+          {err && <p className="err" role="alert">{err}</p>}
+          <button className="btn primary">Create</button>
+          <div className="muted sm">Customers, locations and equipment are added on the Customers tab.</div>
+        </form>
+      )}
+
+      <div className="row">
+        <input className="grow" placeholder="Search number, title, customer…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} style={{ width: 'auto' }} aria-label="Filter by status">
+          <option value="active">Not closed</option><option value="all">All</option>
+          {(Object.keys(STATUS_LABEL) as JobStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+        </select>
+      </div>
+
+      {list.map((j) => (
+        <button className="card jobrow" key={j.id} onClick={() => d.openJob(j.id)}>
+          <div className="row between">
+            <span><b>{j.number}</b> · {j.title}</span>
+            <span className={'pill st-' + j.status}>{STATUS_LABEL[j.status]}</span>
+          </div>
+          <div className="muted sm">{[j.kind === 'project' ? 'Project' : 'Ticket', cust(j.customer_id), loc(j.location_id), j.priority !== 'Normal' && j.priority].filter(Boolean).join(' · ')}</div>
+        </button>
       ))}
-      {!jobs.length && <p className="muted">No jobs yet.</p>}
+      {!list.length && <p className="muted">Nothing matches.</p>}
     </section>
   )
 }

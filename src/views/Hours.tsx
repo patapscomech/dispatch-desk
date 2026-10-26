@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase'
+import { cached, remember, send } from '../lib/offline'
+import { uuid } from '../lib/image'
 import type { Data } from '../App'
 import { isOffice, type Entry, type PayType } from '../types'
 import { addDays, fmtDay, fmtRange, today, weekDays } from '../lib/dates'
@@ -12,7 +14,7 @@ export const jobLabel = (d: Pick<Data, 'jobs' | 'tasks'>) => (jobId: string | nu
   return `${j ? j.number + ' ' + j.title : 'Unknown job'}${t ? ' / ' + t.name : ''}`
 }
 
-export default function Hours({ d }: { d: Data }) {
+export default function Hours({ d, presetJob = '' }: { d: Data; presetJob?: string }) {
   const [anchor, setAnchor] = useState(today())
   const [forId, setForId] = useState(d.me.id)
   const [entries, setEntries] = useState<Entry[]>([])
@@ -23,23 +25,29 @@ export default function Hours({ d }: { d: Data }) {
   const label = jobLabel(d)
 
   const [date, setDate] = useState(today())
-  const [jobId, setJobId] = useState('')
+  const [jobId, setJobId] = useState(presetJob)
   const [taskId, setTaskId] = useState('')
   const [hrs, setHrs] = useState('')
   const [pay, setPay] = useState<PayType>('regular')
   const [notes, setNotes] = useState('')
 
+  const key = `hours:${forId}:${days[0]}`
+  const [offlineNote, setOfflineNote] = useState(false)
   const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('time_entries')
-      .select('*')
-      .eq('employee_id', forId)
-      .gte('work_date', days[0])
-      .lte('work_date', days[6])
-      .order('created_at')
-    if (error) setErr(error.message)
-    else setEntries(data as Entry[])
-  }, [forId, days])
+    const r = await cached<Entry[]>(key, async () => {
+      const { data, error } = await supabase
+        .from('time_entries')
+        .select('*')
+        .eq('employee_id', forId)
+        .gte('work_date', days[0])
+        .lte('work_date', days[6])
+        .order('created_at')
+      if (error) throw new Error(error.message)
+      return data as Entry[]
+    })
+    setEntries(r.data ?? [])
+    setOfflineNote(r.fromCache)
+  }, [forId, days, key])
   useEffect(() => { load() }, [load])
   useEffect(() => { if (!days.includes(date)) setDate(days[0]) }, [days, date])
 
@@ -52,34 +60,38 @@ export default function Hours({ d }: { d: Data }) {
     if (!(h > 0 && h <= 24)) return setErr('Enter hours between 0.25 and 24.')
     setBusy(true)
     setErr('')
-    const { error } = await supabase.from('time_entries').insert({
-      employee_id: forId,
-      work_date: date,
-      hours: r2(h),
-      pay_type: pay,
-      job_id: jobId || null,
-      task_id: taskId || null,
-      notes: notes.trim(),
-    })
+    const row = {
+      id: uuid(), employee_id: forId, work_date: date, hours: r2(h), pay_type: pay,
+      job_id: jobId || null, task_id: taskId || null, notes: notes.trim(),
+    }
+    const mine: Entry = { ...row, status: 'open', classification: '', prevailing_wage: !!d.jobs.find((j) => j.id === jobId)?.prevailing_wage }
+    const next = [...entries, mine]
+    setEntries(next)
+    remember(key, next)
+    const r = await send({ kind: 'insert', table: 'time_entries', values: row })
     setBusy(false)
-    if (error) return setErr(error.message)
+    if (r.error) { setErr(r.error); await load(); return }
     setHrs('')
     setNotes('')
-    load()
+    if (!r.queued) load()
   }
   async function remove(id: string) {
-    const { error } = await supabase.from('time_entries').delete().eq('id', id)
-    if (error) setErr(error.message)
-    else load()
+    const next = entries.filter((x) => x.id !== id)
+    setEntries(next)
+    remember(key, next)
+    const r = await send({ kind: 'delete', table: 'time_entries', match: { id } })
+    if (r.error) { setErr(r.error); load() }
   }
   async function submitWeek() {
     const ids = entries.filter((x) => x.status === 'open').map((x) => x.id)
     if (!ids.length) return
     setBusy(true)
-    const { error } = await supabase.from('time_entries').update({ status: 'submitted' }).in('id', ids)
+    const next = entries.map((x) => (ids.includes(x.id) ? { ...x, status: 'submitted' as const } : x))
+    setEntries(next)
+    remember(key, next)
+    const r = await send({ kind: 'update', table: 'time_entries', values: { status: 'submitted' }, match: {}, inIds: { col: 'id', ids } })
     setBusy(false)
-    if (error) setErr(error.message)
-    else load()
+    if (r.error) { setErr(r.error); load() }
   }
 
   const weekTotal = r2(entries.reduce((s, x) => s + Number(x.hours), 0))
@@ -94,6 +106,7 @@ export default function Hours({ d }: { d: Data }) {
         <button className="btn" onClick={() => setAnchor(addDays(days[0], 7))} aria-label="Next week">›</button>
       </div>
 
+      {offlineNote && <p className="warn">No signal: showing hours saved on this phone. New hours are kept and sent when you are back in coverage.</p>}
       {isOffice(d.me.role) && (
         <label className="inline">Entering hours for
           <select value={forId} onChange={(e) => setForId(e.target.value)}>
