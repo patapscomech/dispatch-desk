@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import type { Data } from '../App'
 import type { Contract, Equipment } from '../types'
+import ContractRates from './ContractRates'
 
 export const EQUIP_TYPES = ['RTU', 'AHU', 'Chiller', 'Boiler', 'Pump', 'Cooling tower', 'Split system', 'VAV box', 'Exhaust fan', 'Backflow preventer', 'Water heater', 'Other']
 
@@ -123,9 +124,10 @@ export default function Customers({ d }: { d: Data }) {
             <div className="row between" key={c.id} style={c.active ? undefined : { opacity: 0.6 }}>
               <span>{c.name} <span className="muted sm">· {c.type}{c.prevailing_wage ? ' · prevailing wage' : ''}{c.start_date || c.end_date ? ` · ${c.start_date ?? ''} to ${c.end_date ?? ''}` : ''}</span></span>
               <button className="btn ghost" onClick={() => toggleContract(c)}>{c.active ? 'Turn off' : 'Turn on'}</button>
+              <div style={{ flexBasis: '100%' }}><ContractRates contractId={c.id} /></div>
             </div>
           ))}
-          {!contractsOf.length && <div className="muted sm">No contracts yet. Technicians cannot create a call for this customer until it has an active contract. Rates and pricing are added in the billing phase.</div>}
+          {!contractsOf.length && <div className="muted sm">No contracts yet. Technicians cannot create a call for this customer until it has an active contract.</div>}
           <form className="form" onSubmit={addContract}>
             <div className="grid2">
               <input placeholder="New contract name" value={k.name} onChange={(e) => setK({ ...k, name: e.target.value })} required />

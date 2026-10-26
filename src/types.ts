@@ -97,7 +97,7 @@ export interface Template {
   name: string
   body: string
 }
-export const PART_SOURCES = ['Stock', 'Purchased', 'Supplier PO', 'Subcontractor'] as const
+export const PART_SOURCES = ['Stock', 'Purchased', 'Supplier PO', 'Subcontractor', 'Rental'] as const
 export interface JobPart {
   id: string
   job_id: string
@@ -132,6 +132,7 @@ export interface Entry {
   work_date: string
   hours: number
   pay_type: PayType
+  after_hours?: boolean
   job_id: string | null
   task_id: string | null
   notes: string
@@ -140,7 +141,7 @@ export interface Entry {
   prevailing_wage: boolean
 }
 
-export const CLASSES = ['Foreman', 'Journeyman', 'Apprentice', 'Helper'] as const
+export const CLASSES = ['Foreman', 'Journeyman', 'Apprentice', 'Helper', 'Shop Mechanic'] as const
 export const ROLE_LABEL: Record<Role, string> = {
   owner: 'Owner',
   office: 'Office',

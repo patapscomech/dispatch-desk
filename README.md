@@ -43,3 +43,10 @@ npm run build    # type-check and production build
 - The publishable key in `src/supabase.ts` is meant to be public. The secret / service-role key must never be committed.
 - Offline limits: unsent changes live in the phone's browser storage, so do not clear site data or remove the app until the banner clears. iPhone can discard saved data for sites not used for about a week unless the app is added to the Home Screen. Photos already uploaded are viewed with signal; a thumbnail cache is a later improvement. Calls dispatched while a technician is out of coverage cannot be saved ahead of time.
 - Not built yet: projects with budgets and time by task reports, billing (T&M, cost plus, fixed, PM), QuickBooks Online, certified payroll report, push notifications, per-foreman crews.
+
+## Phase 3 (in progress): contract rates
+
+Run `supabase/migrations/0004_contract_rates.sql` after 0003. It adds the Shop Mechanic class, an
+after-hours billing flag on each hours entry, a Rental part source, and per-contract billing terms.
+In **Customers**, each contract has a "Billing terms and rates" editor (office only): labor rates
+by class (or one rate for everyone), markups, trip charge. Technicians cannot read rates or markups.

@@ -69,7 +69,7 @@ export default function App() {
         supabase.from('customers').select('*').order('name'),
         supabase.from('locations').select('*').order('name'),
         supabase.from('checklist_templates').select('*').order('name'),
-        supabase.from('contracts').select('*').order('name'),
+        supabase.from('contracts_basic').select('*').order('name'),
       ])
       const err = p.error || j.error || t.error || c.error || l.error || tp.error || k.error
       if (err) throw new Error(err.message)

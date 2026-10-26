@@ -29,6 +29,7 @@ export default function Hours({ d, presetJob = '' }: { d: Data; presetJob?: stri
   const [taskId, setTaskId] = useState('')
   const [hrs, setHrs] = useState('')
   const [pay, setPay] = useState<PayType>('regular')
+  const [afterHours, setAfterHours] = useState(false)
   const [notes, setNotes] = useState('')
 
   const key = `hours:${forId}:${days[0]}`
@@ -61,7 +62,7 @@ export default function Hours({ d, presetJob = '' }: { d: Data; presetJob?: stri
     setBusy(true)
     setErr('')
     const row = {
-      id: uuid(), employee_id: forId, work_date: date, hours: r2(h), pay_type: pay,
+      id: uuid(), employee_id: forId, work_date: date, hours: r2(h), pay_type: pay, after_hours: afterHours,
       job_id: jobId || null, task_id: taskId || null, notes: notes.trim(),
     }
     const mine: Entry = { ...row, status: 'open', classification: '', prevailing_wage: !!d.jobs.find((j) => j.id === jobId)?.prevailing_wage }
@@ -146,6 +147,12 @@ export default function Hours({ d, presetJob = '' }: { d: Data; presetJob?: stri
             <select value={pay} onChange={(e) => setPay(e.target.value as PayType)}>
               <option value="regular">Regular</option>
               <option value="ot">Overtime</option>
+            </select>
+          </label>
+          <label>Billed as
+            <select value={afterHours ? 'ah' : 'reg'} onChange={(e) => setAfterHours(e.target.value === 'ah')}>
+              <option value="reg">Regular hours (Mon-Fri 8a-5p)</option>
+              <option value="ah">After hours / weekend / holiday</option>
             </select>
           </label>
           <label>Note (optional)
