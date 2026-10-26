@@ -43,7 +43,7 @@ export default function Hours({ d }: { d: Data }) {
   useEffect(() => { load() }, [load])
   useEffect(() => { if (!days.includes(date)) setDate(days[0]) }, [days, date])
 
-  const openJobs = d.jobs.filter((j) => j.status === 'open')
+  const openJobs = d.jobs.filter((j) => j.status !== 'closed')
   const jobTasks = d.tasks.filter((t) => t.job_id === jobId)
 
   async function add(e: React.FormEvent) {
