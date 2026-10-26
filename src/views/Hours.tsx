@@ -157,7 +157,12 @@ export default function Hours({ d, presetJob = '' }: { d: Data; presetJob?: stri
               <option value="holiday">Sunday / holiday</option>
             </select>
           </label>
-          <label className="check"><input type="checkbox" checked={controls} onChange={(e) => setControls(e.target.checked)} /> Controls repair</label>
+          <label>Type of work
+            <select value={controls ? 'controls' : 'standard'} onChange={(e) => setControls(e.target.value === 'controls')}>
+              <option value="standard">Standard service / install</option>
+              <option value="controls">Controls repair</option>
+            </select>
+          </label>
           <label>Note (optional)
             <input value={notes} onChange={(e) => setNotes(e.target.value)} />
           </label>
